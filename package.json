@@ -1,0 +1,31 @@
+{
+  "name": "dendreth-proofs-api",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "scripts": {
+    "start": "node ./src/server.js | npx pino-pretty",
+    "format": "prettier --config ./.prettierrc --write  \"./**/*.+(js|ts|json)\"",
+    "start:dev": "nodemon"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@chainsafe/persistent-merkle-tree": "^0.8.0",
+    "@ethereumjs/rlp": "^5.0.2",
+    "@ethereumjs/trie": "^6.2.1",
+    "@ethereumjs/tx": "^5.4.0",
+    "@lodestar/types": "^1.21.0",
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.26.2",
+    "node-fetch": "^3.3.2",
+    "pino": "^8.19.0",
+    "pino-pretty": "^11.0.0",
+    "viem": "^2.9.9"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prettier": "^3.2.5"
+  }
+}
