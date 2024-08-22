@@ -32,7 +32,7 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   })
 
   logger.info('Checking finality ...')
-  let txSlot = null
+  let transactionSlot = null
   const {
     data: { data }
   } = await axios.get(`https://sepolia.beaconcha.in/api/v1/execution/block/${receipt.blockNumber}`)
@@ -44,13 +44,13 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   if (!finalized) {
     return _reply.code(400).send({ error: 'Block not finalized' })
   }
-  txSlot = slot
+  transactionSlot = slot
 
   logger.info('Calculating receipt proof ...')
   const { receiptProof, receiptsRoot } = await getReceiptProof(transactionHash, sourceClient)
 
   logger.info('Getting the correct light client slot ...')
-  // NOTE: find the first slot > txSlot
+  // NOTE: find the first slot > transactionSlot
   const initialIndex = await targetClient.readContract({
     address: process.env.LC_ADDRESS,
     abi: dendrethAbi,
@@ -58,45 +58,26 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   })
   let currentIndex = initialIndex
   let inverted = false
-  let lastLightClientSlot = null
-  try {
-    while (true) {
-      const lightClientSlot = await targetClient.readContract({
-        address: process.env.LC_ADDRESS,
-        abi: dendrethAbi,
-        functionName: 'optimisticSlots',
-        args: [currentIndex]
-      })
-
-      if (txSlot > lightClientSlot) {
-        break
-      }
-      lastLightClientSlot = lightClientSlot
-
-      if (currentIndex === 0n) {
-        inverted = true
-        currentIndex = initialIndex
-      }
-      currentIndex = inverted ? (currentIndex += 1n) : currentIndex - 1n
-      await sleep(1000)
-    }
-  } catch (_err) {
-    return _reply.code(404).send({
-      error:
-        'The slot containing the block where the transaction emitted the MessageDispatched event has not been stored within the Light Client'
-    })
-  }
+  const lightClientSlot = await targetClient.readContract({
+    address: process.env.LC_ADDRESS,
+    abi: dendrethAbi,
+    functionName: 'optimisticSlots',
+    args: [currentIndex]
+  })
 
   logger.info('Getting receipts root proof ...')
-  const { receiptsRootProof } = await getReceiptsRootProof(
-    Number(lastLightClientSlot),
-    Number(txSlot),
-    axios.create({
-      baseURL: process.env.SOURCE_BEACON_API_URL,
-      responseType: 'json',
-      headers: { 'Content-Type': 'application/json' }
-    })
+  const { receiptsRootProof, receiptsRoot: receiptsRootFromSlot } = await getReceiptsRootProof(
+    Number(lightClientSlot),
+    Number(transactionSlot),
+    [process.env.SOURCE_BEACON_API_URL],
+    sourceChain
   )
+
+  if (receiptsRoot !== receiptsRootFromSlot) {
+    return _reply
+      .code(500)
+      .send({ error: 'Receipts root mismatch.' + 'Slot root: ' + receiptsRootFromSlot + 'Tx root: ' + receiptsRoot })
+  }
 
   logger.info('Getting log index ...')
   const logIndex = receipt.logs.findIndex(({ topics }) => topics[0] === MESSAGE_DISPATCHED_TOPIC)
@@ -105,8 +86,8 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   }
 
   const proof = [
-    parseInt(lastLightClientSlot),
-    parseInt(txSlot),
+    parseInt(lightClientSlot),
+    parseInt(transactionSlot),
     receiptsRootProof,
     receiptsRoot,
     receiptProof,

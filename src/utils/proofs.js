@@ -1,89 +1,95 @@
-import { ssz } from '@lodestar/types'
-import { ProofType, createProof } from '@chainsafe/persistent-merkle-tree'
 import { TransactionType } from '@ethereumjs/tx'
 import { hexToBytes, concatBytes, bigIntToBytes, intToBytes } from '@ethereumjs/util'
 import { toHexString, fromHexString } from '@chainsafe/ssz'
 import { RLP } from '@ethereumjs/rlp'
 import { Trie } from '@ethereumjs/trie'
 import { bytesToHex } from 'viem'
+import { createChainConfig, createChainForkConfig } from '@lodestar/config'
+import { ProofType, Tree } from '@chainsafe/persistent-merkle-tree'
+import { getClient } from '@lodestar/api'
+import { mainnetChainConfig, sepoliaChainConfig } from '@lodestar/config/networks'
+import { sepolia } from 'viem/chains'
 
 const SLOTS_PER_HISTORICAL_ROOT = 8192
 
-export const toStringFromBeaconId = (identifier) => {
-  if (identifier instanceof Uint8Array) {
-    return toHexString(identifier)
-  }
-  return identifier.toString()
-}
-
-export const getState = async (_stateId, _client) => {
-  const { data } = await _client.get(`/eth/v2/debug/beacon/states/${toStringFromBeaconId(_stateId)}`)
-  if (data.version === 'bellatrix')
-    return {
-      state: ssz.bellatrix.BeaconState.fromJson(data.data),
-      version: 'bellatrix'
+export const getReceiptsRootProof = async (_srcSlot, _targetSlot, _urls, _sourceChain) => {
+  const config = createChainForkConfig(
+    createChainConfig(_sourceChain.id === sepolia.id ? sepoliaChainConfig : mainnetChainConfig)
+  )
+  const api = getClient(
+    {
+      urls: _urls
+    },
+    {
+      config
     }
-  return {
-    state: ssz.capella.BeaconState.fromJson(data.data),
-    version: 'capella'
-  }
-}
-
-export const getHeader = async (_blockId, _client) => {
-  const { data } = await _client.get(`/eth/v1/beacon/headers/${toStringFromBeaconId(_blockId)}`)
-  return ssz.phase0.BeaconBlockHeader.fromJson(data.data.header.message)
-}
-
-export const getReceiptsRootProof = async (_srcBlockId, _targetBlockId, _client) => {
-  const { state: srcState, version: srcVersion } = await getState(toStringFromBeaconId(_srcBlockId), _client)
-  const { state: targetState, version: targetVersion } = await getState(toStringFromBeaconId(_targetBlockId), _client)
-
-  const srcView = ssz[srcVersion].BeaconState.toView(srcState)
-  const targetView = ssz[targetVersion].BeaconState.toView(targetState)
-  const srcSlot = srcState.slot
-  const targetSlot = targetState.slot
-
-  const srcHeader = await getHeader(_srcBlockId, _client)
-  const srcHeaderView = ssz.phase0.BeaconBlockHeader.toView(srcHeader)
+  )
 
   let receiptsRootProof
   let receiptsRoot
-  if (srcSlot == targetSlot) {
-    const receiptGindex = ssz[targetVersion].BeaconState.getPathInfo([
-      'latestExecutionPayloadHeader',
-      'receiptsRoot'
-    ]).gindex
-    const receiptProof = createProof(targetView.node, {
-      type: ProofType.single,
-      gindex: receiptGindex
+  if (_srcSlot == _targetSlot) {
+    const oldBlockRes = await api.beacon.getBlockV2({
+      blockId: _targetSlot
     })
-    receiptsRootProof = receiptProof.witnesses.map(toHexString)
+    const oldBlockView = config.getForkTypes(_srcSlot).BeaconBlock.toView(oldBlockRes.value().message)
+    const oldBlockProof = oldBlockView.createProof([receiptPath])
+    const oldBlockTree = Tree.createFromProof(oldBlockProof)
+    const receiptProof = oldBlockTree.getProof({
+      type: ProofType.single,
+      gindex: RECEIPT_INDEX
+    })
+
+    receiptsRootProof = receiptProof.witnesses
+      .concat(rootProof.witnesses)
+      .concat(stateRootProof.witnesses)
+      .map(bytesToHex)
     receiptsRoot = toHexString(receiptProof.leaf)
-  } else if (srcSlot - targetSlot < 8192) {
-    const headerGindex = ssz.phase0.BeaconBlockHeader.getPathInfo(['stateRoot']).gindex
-    const headerProof = createProof(srcHeaderView.node, {
+  } else if (_srcSlot - _targetSlot < SLOTS_PER_HISTORICAL_ROOT) {
+    const statePath = ['state_root']
+    const rootPath = ['block_roots', _targetSlot % SLOTS_PER_HISTORICAL_ROOT]
+    const receiptPath = ['body', 'execution_payload', 'receipts_root']
+
+    const STATE_INDEX = config.getForkTypes(_srcSlot).BeaconBlockHeader.getPathInfo(statePath).gindex
+    const ROOT_INDEX = config.getForkTypes(_srcSlot).BeaconState.getPathInfo(rootPath).gindex
+    const RECEIPT_INDEX = config.getForkTypes(_srcSlot).BeaconBlock.getPathInfo(receiptPath).gindex
+
+    const blockRes = await api.beacon.getBlockV2({
+      blockId: _srcSlot
+    })
+    const blockView = config.getForkTypes(_srcSlot).BeaconBlock.toView(blockRes.value().message)
+    const blockProof = blockView.createProof([statePath])
+    const blockTree = Tree.createFromProof(blockProof)
+    const stateRootProof = blockTree.getProof({
       type: ProofType.single,
-      gindex: headerGindex
+      gindex: STATE_INDEX
     })
 
-    const stateRootGindex = ssz[targetVersion].BeaconState.getPathInfo([
-      'stateRoots',
-      targetSlot % SLOTS_PER_HISTORICAL_ROOT
-    ]).gindex
-    const proof = createProof(srcView.node, {
+    const stateRes = await api.debug.getStateV2({
+      stateId: _srcSlot
+    })
+    const stateView = config.getForkTypes(_srcSlot).BeaconState.toView(stateRes.value())
+    const stateProof = stateView.createProof([rootPath])
+    const stateTree = Tree.createFromProof(stateProof)
+    const rootProof = stateTree.getProof({
       type: ProofType.single,
-      gindex: stateRootGindex
+      gindex: ROOT_INDEX
     })
 
-    const receiptGindex = ssz[targetVersion].BeaconState.getPathInfo([
-      'latestExecutionPayloadHeader',
-      'receiptsRoot'
-    ]).gindex
-    const receiptProof = createProof(targetView.node, {
-      type: ProofType.single,
-      gindex: receiptGindex
+    const oldBlockRes = await api.beacon.getBlockV2({
+      blockId: _targetSlot
     })
-    receiptsRootProof = receiptProof.witnesses.concat(proof.witnesses).concat(headerProof.witnesses).map(toHexString)
+    const oldBlockView = config.getForkTypes(_srcSlot).BeaconBlock.toView(oldBlockRes.value().message)
+    const oldBlockProof = oldBlockView.createProof([receiptPath])
+    const oldBlockTree = Tree.createFromProof(oldBlockProof)
+    const receiptProof = oldBlockTree.getProof({
+      type: ProofType.single,
+      gindex: RECEIPT_INDEX
+    })
+
+    receiptsRootProof = receiptProof.witnesses
+      .concat(rootProof.witnesses)
+      .concat(stateRootProof.witnesses)
+      .map(bytesToHex)
     receiptsRoot = toHexString(receiptProof.leaf)
   } else {
     throw Error('slots are too far')

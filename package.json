@@ -15,6 +15,8 @@
     "@ethereumjs/rlp": "^5.0.2",
     "@ethereumjs/trie": "^6.2.1",
     "@ethereumjs/tx": "^5.4.0",
+    "@lodestar/api": "^1.21.0",
+    "@lodestar/config": "^1.21.0",
     "@lodestar/types": "^1.21.0",
     "axios": "^1.6.8",
     "dotenv": "^16.4.5",
