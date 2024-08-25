@@ -8,7 +8,6 @@ import logger from '../../utils/logger.js'
 import dendrethAbi from '../../utils/abi/dendreth.js'
 import { getReceiptProof, getReceiptsRootProof } from '../../utils/proofs.js'
 import sleep from '../../utils/sleep.js'
-import { privateKeyToAccount } from 'viem/accounts'
 
 const MESSAGE_DISPATCHED_TOPIC = '0x218247aabc759e65b5bb92ccc074f9d62cd187259f2a0984c3c9cf91f67ff7cf'
 
@@ -95,32 +94,6 @@ const getMessageDispatchedProof = async (_request, _reply) => {
     '0x' + Buffer.from(RLP.encode(receipt.transactionIndex)).toString('hex'),
     logIndex
   ]
-
-  if (process.env.WRITE_TO_VERIFY == 'true') {
-    logger.info('Verifying MessageDispatched event on DendrETH Adapter')
-    const account = privateKeyToAccount(process.env.PRIVATE_KEY)
-    const targetWriteClient = createWalletClient({
-      account,
-      chain: targetChain,
-      transport: http(process.env.TARGET_RPC)
-    })
-
-    let { request } = await targetClient.simulateContract({
-      account,
-      abi: [
-        parseAbiItem(
-          'function verifyAndStoreDispatchedMessage(uint64 srcSlot,uint64 txSlot,bytes32[] memory receiptsRootProof,bytes32 receiptsRoot,bytes[] memory receiptProof,bytes memory txIndexRLPEncoded,uint256 logIndex) external'
-        )
-      ],
-      functionName: 'verifyAndStoreDispatchedMessage',
-      address: process.env.DENDRETH_ADAPTER_ADDRESS,
-      args: proof
-    })
-
-    let tx = await targetWriteClient.writeContract(request)
-
-    logger.info(`Verified tx ${tx} `)
-  }
 
   _reply.send({
     proof
