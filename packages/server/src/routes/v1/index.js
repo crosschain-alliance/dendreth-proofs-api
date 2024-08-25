@@ -33,18 +33,51 @@ const getMessageDispatchedProof = async (_request, _reply) => {
 
   logger.info('Checking finality ...')
   let transactionSlot = null
-  const {
-    data: { data }
-  } = await axios.get(`https://sepolia.beaconcha.in/api/v1/execution/block/${receipt.blockNumber}`)
-  const [
-    {
-      posConsensus: { slot, finalized }
+
+  if (sourceClient.chain.id === 10200) {
+    // Chiado
+    const blockNumber = receipt.blockNumber
+    // get latest beacon slot
+    let beaconBlock = await axios.get(`${process.env.SOURCE_BEACON_API_URL}/eth/v1/beacon/blocks/head`)
+
+    let slot = BigInt(beaconBlock.data.data.message.slot)
+    let blockNumberFromBeaconBlock = BigInt(beaconBlock.data.data.message.body.execution_payload.block_number)
+
+    let diff = blockNumberFromBeaconBlock - blockNumber
+
+    do {
+      if (diff == 0n) break
+
+      try {
+        beaconBlock = await axios.get(`${process.env.SOURCE_BEACON_API_URL}/eth/v1/beacon/blocks/${slot - diff}`)
+        blockNumberFromBeaconBlock = beaconBlock.data.data.message.body.execution_payload.block_number
+        slot = BigInt(beaconBlock.data.data.message.slot)
+        blockNumberFromBeaconBlock = BigInt(beaconBlock.data.data.message.body.execution_payload.block_number)
+        diff = blockNumberFromBeaconBlock - blockNumber
+      } catch (err) {
+        return _reply.code(400).send({ error: 'Cant find coresponding slot' })
+      }
+    } while (diff != 0n)
+
+    if (diff == 0) {
+      console.log(`Found slot ${slot} corresponding to ${blockNumber} block Number on ${sourceClient.chain.name}`)
     }
-  ] = data
-  if (!finalized) {
-    return _reply.code(400).send({ error: 'Block not finalized' })
+    transactionSlot = slot
+  } else {
+    const {
+      data: { data }
+    } = await axios.get(`https://sepolia.beaconcha.in/api/v1/execution/block/${receipt.blockNumber}`)
+    const [
+      {
+        posConsensus: { slot, finalized }
+      }
+    ] = data
+
+    if (!finalized) {
+      return _reply.code(400).send({ error: 'Block not finalized' })
+    }
+    transactionSlot = slot
   }
-  transactionSlot = slot
 
   logger.info('Calculating receipt proof ...')
   const { receiptProof, receiptsRoot } = await getReceiptProof(transactionHash, sourceClient)
