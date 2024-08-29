@@ -1,11 +1,11 @@
 FROM node:18-alpine
 
-WORKDIR /usr/src/app
+WORKDIR /usr/src/app/packages/server
 
-COPY package.json yarn.lock ./
+COPY ./packages/server/package.json ./packages/server/yarn.lock ./
 
 RUN yarn install
 
-COPY . .
+COPY  ./packages/server .
 
-CMD ["yarn","start"]
+CMD ["node", "./src/server.js"]
