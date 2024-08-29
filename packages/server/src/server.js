@@ -38,9 +38,9 @@ fastify.addHook('onRequest', function (request, reply, next) {
 
 fastify.register(routes, { prefix: '/v1' })
 
-fastify.listen({ port }, (_err, _address) => {
+fastify.listen({ port, host: '0.0.0.0' }, (_err, _address) => {
   if (_err) {
-    fastify.log._error(_err)
+    fastify.log.error(_err)
   }
   fastify.log.info(`Fastify is listening on port: ${_address}`)
 })
