@@ -73,9 +73,9 @@ const getMessageDispatchedProof = async (_request, _reply) => {
       }
     ] = data
 
-    // if (!finalized) {
-    //   return _reply.code(400).send({ error: 'Block not finalized' })
-    // }
+    if (!finalized) {
+      return _reply.code(400).send({ error: 'Block not finalized' })
+    }
     transactionSlot = slot
   }
 
