@@ -1,7 +1,3 @@
-import winston from "winston"
-
-
-
 class Watcher {
   logger
   onLogs
@@ -9,8 +5,8 @@ class Watcher {
   contractAddress
   abi
   eventName
-   _lastBlock
-   _watchIntervalTimeMs
+  _lastBlock
+  _watchIntervalTimeMs
 
   constructor(_configs) {
     this.logger = _configs.logger.child({ service: _configs.service })
@@ -30,10 +26,12 @@ class Watcher {
       setInterval(() => {
         this._watch()
       }, this._watchIntervalTimeMs)
-    } catch (_err) {}
+    } catch (_err) {
+      this.logger.error(_err)
+    }
   }
 
- async _watch() {
+  async _watch() {
     try {
       const currentBlock = await this.client.getBlockNumber()
       if (!this._lastBlock) {
@@ -43,34 +41,24 @@ class Watcher {
       const fromBlock = this._lastBlock + 1n
       const toBlock = currentBlock
       this.logger.info(
-        ` ${this.eventName} events from block ${fromBlock} to block ${toBlock} on ${this.client.chain.name} , contract ${this.contractAddress}...`,
+        ` ${this.eventName} events from block ${fromBlock} to block ${toBlock} on ${this.client.chain.name} , contract ${this.contractAddress}...`
       )
-
-      // const filter = await this.client.createContractEventFilter({
-      //   address: this.contractAddress,
-      //   abi: this.abi,
-      //   eventName: this.eventName,
-      //   fromBlock,
-      //   toBlock,
-      // })
-      // this.logger.info("new code")
-      // const logs = (await this.client.getFilterLogs({ filter })) as Log[]
 
       const logs = await this.client.getContractEvents({
         address: this.contractAddress,
         abi: this.abi,
         eventName: this.eventName,
         fromBlock,
-        toBlock,
+        toBlock
       })
       this.logger.info(`The log  ${logs.length}`)
 
       if (logs.length) {
         this.logger.info(
-          `Detected ${logs.length} new ${this.eventName} events on ${this.client.chain.name}. Processing them ...`,
+          `Detected ${logs.length} new ${this.eventName} events on ${this.client.chain.name}. Processing them ...`
         )
         await this.onLogs(logs)
-        this.logger.info("Events succesfully processed.")
+        this.logger.info('Events succesfully processed.')
       }
 
       this._lastBlock = currentBlock
