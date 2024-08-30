@@ -14,34 +14,9 @@ const SLOTS_PER_HISTORICAL_ROOT = 8192
 
 export const getReceiptsRootProof = async (_srcSlot, _targetSlot, _urls, _sourceChain) => {
   let chainConfig
-  switch (_sourceChain.id) {
-    case sepolia.id:
-      chainConfig = sepoliaChainConfig
-      break
-    case gnosisChiado.id:
-      chainConfig = chiadoChainConfig
-      break
-    case mainnet.id:
-      chainConfig = mainnetChainConfig
-      break
-    case gnosis.id:
-      chainConfig = gnosisChainConfig
-      break
-    default:
-      chainConfig = sepoliaChainConfig
-      break
-  }
-
-  const config = createChainForkConfig(createChainConfig(chainConfig))
-
-  const api = getClient(
-    {
-      urls: _urls
-    },
-    {
-      config
-    }
-  )
+  let api
+  let config
+  ;({ api, config, chainConfig } = getBeaconApi(_sourceChain, chainConfig, _urls))
 
   let receiptsRootProof
   let receiptsRoot
@@ -198,4 +173,36 @@ export const getReceiptProof = async (_hash, _client) => {
   }
 
   return { receiptProof: (await trie.createProof(receiptKey)).map(bytesToHex), receiptsRoot: block.receiptsRoot }
+}
+
+export function getBeaconApi(_sourceChain, chainConfig, _urls) {
+  switch (_sourceChain.id) {
+    case sepolia.id:
+      chainConfig = sepoliaChainConfig
+      break
+    case gnosisChiado.id:
+      chainConfig = chiadoChainConfig
+      break
+    case mainnet.id:
+      chainConfig = mainnetChainConfig
+      break
+    case gnosis.id:
+      chainConfig = gnosisChainConfig
+      break
+    default:
+      chainConfig = sepoliaChainConfig
+      break
+  }
+
+  const config = createChainForkConfig(createChainConfig(chainConfig))
+
+  const api = getClient(
+    {
+      urls: _urls
+    },
+    {
+      config
+    }
+  )
+  return { api, config, chainConfig }
 }
