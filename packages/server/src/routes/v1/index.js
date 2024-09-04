@@ -104,7 +104,7 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   let config
   ;({ api, config, chainConfig } = getBeaconApi(sourceChain, chainConfig, [process.env.SOURCE_BEACON_API_URL]))
 
-  let finalizedBlockHeader = (await api.beacon.getBlockHeaders(lightClientFinalizedHeader)).value()[0]
+  let finalizedBlockHeader = (await api.beacon.getBlockHeader({ blockId: lightClientFinalizedHeader })).value()
 
   let lightClientSlot = finalizedBlockHeader.header.message.slot
 
