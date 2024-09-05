@@ -147,12 +147,12 @@ export default [
             type: 'uint256[2]'
           }
         ],
-        internalType: 'struct BeaconLightClient.LightClientUpdate',
+        internalType: 'struct ILightClient.LightClientUpdate',
         name: 'update',
         type: 'tuple'
       }
     ],
-    name: 'light_client_update',
+    name: 'lightClientUpdate',
     outputs: [],
     stateMutability: 'payable',
     type: 'function'

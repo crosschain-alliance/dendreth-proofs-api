@@ -1,12 +1,12 @@
 import 'dotenv/config'
-import { createPublicClient, http, createWalletClient, parseAbiItem } from 'viem'
+import { createPublicClient, http, createWalletClient, parseAbiItem, bytesToHex } from 'viem'
 import * as chains from 'viem/chains'
 import axios from 'axios'
 import { RLP } from '@ethereumjs/rlp'
-
+import { Tree } from '@chainsafe/persistent-merkle-tree'
 import logger from '../../utils/logger.js'
 import dendrethAbi from '../../utils/abi/dendreth.js'
-import { getReceiptProof, getReceiptsRootProof } from '../../utils/proofs.js'
+import { getBeaconApi, getReceiptProof, getReceiptsRootProof } from '../../utils/proofs.js'
 import sleep from '../../utils/sleep.js'
 
 const MESSAGE_DISPATCHED_TOPIC = '0x218247aabc759e65b5bb92ccc074f9d62cd187259f2a0984c3c9cf91f67ff7cf'
@@ -91,12 +91,30 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   })
   let currentIndex = initialIndex
   let inverted = false
-  const lightClientSlot = await targetClient.readContract({
+
+  const lightClientFinalizedHeader = await targetClient.readContract({
     address: process.env.LC_ADDRESS,
     abi: dendrethAbi,
-    functionName: 'optimisticSlots',
+    functionName: 'finalizedHeaders',
     args: [currentIndex]
   })
+
+  let chainConfig
+  let api
+  let config
+  ;({ api, config, chainConfig } = getBeaconApi(sourceChain, chainConfig, [process.env.SOURCE_BEACON_API_URL]))
+
+  let finalizedBlockHeader = (await api.beacon.getBlockHeader({ blockId: lightClientFinalizedHeader })).value()
+
+  let lightClientSlot = finalizedBlockHeader.header.message.slot
+
+  const finalizedBlockHeaderView = config
+    .getForkTypes(lightClientSlot)
+    .BeaconBlockHeader.toViewDU(finalizedBlockHeader.header.message)
+
+  let finalizedBlockHeaderTree = new Tree(finalizedBlockHeaderView.node)
+
+  const lightClientSlotProof = finalizedBlockHeaderTree.getSingleProof(8).map(bytesToHex)
 
   logger.info('Getting receipts root proof ...')
   const { receiptsRootProof, receiptsRoot: receiptsRootFromSlot } = await getReceiptsRootProof(
@@ -119,7 +137,9 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   }
 
   const proof = [
+    lightClientFinalizedHeader,
     parseInt(lightClientSlot),
+    lightClientSlotProof,
     parseInt(transactionSlot),
     receiptsRootProof,
     receiptsRoot,
