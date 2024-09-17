@@ -1,36 +1,13 @@
 version: "3.8"
 services:
-    mongodb:
-        image: mongo:latest
-        container_name: mongodb
-        ports:
-          - "27017:27017"
-        networks:
-          - mongo-network
-        volumes:
-          - mongo-data:/data/db
-
     server:
       build:
         context: .
         dockerfile: ./packages/server/Dockerfile
       container_name: dendreth-api-server
-      networks:
-        - mongo-network
- 
+
     relayer:
       build:
         context: .
         dockerfile: ./packages/relayer/Dockerfile
       container_name: dendreth-relayer
-      networks:
-        - mongo-network
-
-networks:
-  mongo-network:
-    driver: bridge
-
-
-volumes:
-  mongo-data:
-    driver: local

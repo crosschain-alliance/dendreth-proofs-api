@@ -1,12 +1,10 @@
 import axios from 'axios'
 import dotenv from 'dotenv'
 dotenv.config()
-import { MongoClient } from 'mongodb'
-import Watcher from './utils/Watcher.js'
+import Relayer from './utils/Relayer.js'
 import YahoABI from './utils/YahoABI.js'
 import DendrETHAdapterABI from './utils/DendrETHAdapterABI.js'
 import logger from './utils/Logger.js'
-import Executor from './utils/Executor.js'
 import { createWalletClient, http, publicActions } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import * as chains from 'viem/chains'
@@ -14,11 +12,7 @@ import * as chains from 'viem/chains'
 const sourceChain = Object.values(chains).find(({ id }) => id.toString() === process.env.SOURCE_CHAIN_ID)
 if (!sourceChain) throw new Error('Invalid SOURCE_CHAIN_ID')
 const targetChain = Object.values(chains).find(({ id }) => id.toString() === process.env.TARGET_CHAIN_ID)
-if (!sourceChain) throw new Error('Invalid TARGET_CHAIN_ID')
-
-const mongoClient = new MongoClient(process.env.MONGO_DB_URI)
-await mongoClient.connect()
-const db = mongoClient.db('messagedispatch')
+if (!targetChain) throw new Error('Invalid TARGET_CHAIN_ID')
 
 const sourceClient = createWalletClient({
   account: privateKeyToAccount(process.env.PRIVATE_KEY),
@@ -31,53 +25,39 @@ const targetClient = createWalletClient({
   transport: http(process.env.TARGET_RPC ? process.env.TARGET_RPC : '')
 }).extend(publicActions)
 
-const adapter = process.env.DENDRETH_ADAPTER_ADDRESS
-const blockNumber = await sourceClient.getBlockNumber()
-
-const watcher = new Watcher({
+const relayer = new Relayer({
   abi: YahoABI,
-  client: sourceClient,
+  sourceClient,
+  targetClient,
   contractAddress: process.env.SOURCE_YAHO_ADDRESS,
   eventName: 'MessageDispatched',
   logger,
-  service: `DendrETHWatcher`,
+  service: 'DendrETHProver',
   watchIntervalTimeMs: Number(process.env.WATCH_INTERVAL_TIME_MS),
+  requiredBlockConfirmation: Number(process.env.REQUIRED_BLOCK_CONFIRMATION),
   onLogs: async (_logs) => {
     // request proof from API
-    const txHash = _logs.transactionHash
-    try {
-      const { data: proof } = await axios.get(`${process.env.PROOF_API}/${txHash}`)
-    } catch (err) {
-      if (err == 'Block not finalized') {
-        // it's the first time catching the event
-        await db.collection('messageDispatchEvents').findOneAndUpdate(
-          { id: txHash },
-          {
-            $setOnInsert: {
-              chainId: sourceClient?.chain?.id,
-              messageDispatchedTransactionHash: txHash,
-              status: 'pendingBlockToFinalize',
-              lastChecked: new Date(),
-              retries: 0
-            }
-          },
-          { upsert: true, returnDocument: 'after' }
-        )
+    logger.info(`Processing ${_logs.length} MessageDispatched events`)
+    for (let i = 0; i < _logs.length; i++) {
+      try {
+        let txHash = _logs[i].transactionHash
+        let { data: proof } = await axios.get(`${process.env.PROOF_API}/${txHash}`)
+
+        let { request } = await targetClient.simulateContract({
+          account: privateKeyToAccount(process.env.PRIVATE_KEY),
+          abi: DendrETHAdapterABI,
+          functionName: 'verifyAndStoreDispatchedMessage',
+          address: process.env.DENDRETH_ADAPTER_ADDRESS,
+          args: proof.proof
+        })
+
+        let tx = await targetClient.writeContract(request)
+        logger.info(`Event proof successfully verified: ${tx} `)
+      } catch (error) {
+        logger.error(error)
       }
     }
   }
 })
 
-watcher.start()
-
-const executor = new Executor({
-  logger,
-  client: targetClient,
-  contractAddress: process.env.DENDRETH_ADAPTER_ADDRESS,
-  abi: DendrETHAdapterABI,
-  eventName: verifyAndStoreDispatchedMessage,
-  database: db,
-  _watchIntervalTimes: process.env.EXECUTOR_INTERVAL_TIME_MS
-})
-
-executor.start()
+relayer.start()
