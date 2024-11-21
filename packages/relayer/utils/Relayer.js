@@ -41,13 +41,11 @@ class Relayer {
 
   async _watch() {
     try {
-      const currentBlock = await this.sourceClient.getBlockNumber()
-      this.logger.info(`Current block number: ${currentBlock}`)
+      const currentBlock = await this.targetClient.getBlockNumber()
 
       if (!this._lastBlock) {
         this._lastBlock = currentBlock - BigInt(this._maxBlockWindow)
       }
-
       let fromBlock = this._lastBlock
       let toBlock = currentBlock - 1n
       let isBlockRangeMismatch = fromBlock < toBlock ? false : true
@@ -59,7 +57,7 @@ class Relayer {
       }
 
       this.logger.info(
-        `Listening to DendrETH Light Client Update from block ${fromBlock} to block ${toBlock} on ${this.targetClient.chain.name} contract address: ${this.contractAddress}...`
+        `Listening to DendrETH Light Client Update from block ${fromBlock} to block ${toBlock} on ${this.targetClient.chain.name} contract address: ${this.dendrethContractAddress}...`
       )
 
       let LCUpdateLogs = await this.targetClient.getContractEvents({

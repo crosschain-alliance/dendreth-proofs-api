@@ -1,13 +1,24 @@
 version: "3.8"
 services:
-    server:
-      build:
-        context: .
-        dockerfile: ./packages/server/Dockerfile
-      container_name: dendreth-api-server
+  server:
+    build:
+      context: .
+      dockerfile: ./packages/server/Dockerfile
+    container_name: dendreth-api-server
+    networks:
+      - net
+    ports:
+      - "3002:3002"
+  relayer:
+    build:
+      context: .
+      dockerfile: ./packages/relayer/Dockerfile
+    container_name: dendreth-relayer
+    networks:
+      - net
+    depends_on:
+      - server
 
-    relayer:
-      build:
-        context: .
-        dockerfile: ./packages/relayer/Dockerfile
-      container_name: dendreth-relayer
+networks:
+  net:
+    driver: bridge
