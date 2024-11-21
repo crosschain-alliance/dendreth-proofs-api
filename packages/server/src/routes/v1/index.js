@@ -66,7 +66,7 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   } else {
     const {
       data: { data }
-    } = await axios.get(`https://sepolia.beaconcha.in/api/v1/execution/block/${receipt.blockNumber}`)
+    } = await axios.get(`${process.env.BEACONCHA_IN_URL}/api/v1/execution/block/${receipt.blockNumber}`)
     const [
       {
         posConsensus: { slot, finalized }
@@ -105,9 +105,7 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   ;({ api, config, chainConfig } = getBeaconApi(sourceChain, chainConfig, [process.env.SOURCE_BEACON_API_URL]))
 
   let finalizedBlockHeader = (await api.beacon.getBlockHeader({ blockId: lightClientFinalizedHeader })).value()
-
   let lightClientSlot = finalizedBlockHeader.header.message.slot
-
   const finalizedBlockHeaderView = config
     .getForkTypes(lightClientSlot)
     .BeaconBlockHeader.toViewDU(finalizedBlockHeader.header.message)

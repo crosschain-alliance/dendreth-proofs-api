@@ -1,9 +1,9 @@
 # DendrETH proof API
 
-This repository provides event proof api from DendrETH light client, and relayer & executor logic to listen event from Yaho, and verify proof on DendrETH Adapter.
+This repository provides event proof api from DendrETH light client, and relayer logic to listen event from Yaho, and verify proof on DendrETH Adapter.
 
 1. `packages/server`: Prover API logic
-2. `packages/relayer`: Listen to `MessageDispatched` event from Yaho, and call `verifyAndStoreDispatchedMessage` on DendrETH Adapter contract.
+2. `packages/relayer`: Listen to `HashStored` event from DendrETH Adapter, `MessageDispatched` event from Yaho, and call `verifyAndStoreDispatchedMessage` on DendrETH Adapter contract.
 
 ## Dev
 

@@ -1,26 +1,31 @@
+import { getLatestLCUpdateLog } from './utils.js'
 class Relayer {
   logger
   onLogs
   sourceClient
   targetClient
-  contractAddress
-  abi
-  eventName
+  yahoContractAddress
+  dendrethContractAddress
+  YahoABI
+  DendrETHAdapterABI
   _lastBlock
   _watchIntervalTimeMs
-  _requiredBlockConfirmations
-  _blockWindow
+  _maxBlockWindow
+  _maxEventToProve
 
   constructor(_configs) {
     this.logger = _configs.logger.child({ service: _configs.service })
     this.sourceClient = _configs.sourceClient
-    this.contractAddress = _configs.contractAddress
-    this.abi = _configs.abi
-    this.eventName = _configs.eventName
+    this.targetClient = _configs.targetClient
+    this.yahoContractAddress = _configs.yahoContractAddress
+    this.dendrethContractAddress = _configs.dendrethContractAddress
+    this.YahoABI = _configs.YahoABI
+    this.DendrETHAdapterABI = _configs.DendrETHAdapterABI
     this.onLogs = _configs.onLogs
     this._watchIntervalTimeMs = _configs.watchIntervalTimeMs
-    this._requiredBlockConfirmations = BigInt(_configs.requiredBlockConfirmation)
-    this._lastBlock = 0n
+    this._lastBlock = _configs.queryFromBlock ? _configs.queryFromBlock : '0'
+    this._maxBlockWindow = _configs.maxBlockWindow
+    this._maxEventToProve = _configs.maxEventToProve
   }
 
   async start() {
@@ -38,14 +43,13 @@ class Relayer {
     try {
       const currentBlock = await this.sourceClient.getBlockNumber()
       this.logger.info(`Current block number: ${currentBlock}`)
-      this.logger.info(`Required block confirmations: ${this._requiredBlockConfirmations} blocks`)
+
       if (!this._lastBlock) {
-        this._lastBlock = currentBlock - this._requiredBlockConfirmations - 100n // 100n is block buffer
-        this.logger.info(`last block processed: ${this._lastBlock}`)
+        this._lastBlock = currentBlock - BigInt(this._maxBlockWindow)
       }
 
-      let fromBlock = this._lastBlock + 1n
-      let toBlock = currentBlock - this._requiredBlockConfirmations
+      let fromBlock = this._lastBlock
+      let toBlock = currentBlock - 1n
       let isBlockRangeMismatch = fromBlock < toBlock ? false : true
       if (isBlockRangeMismatch) {
         // swap if fromBlock > toBlock
@@ -55,23 +59,55 @@ class Relayer {
       }
 
       this.logger.info(
-        `Listening to ${this.eventName} events from block ${fromBlock} to block ${toBlock} on ${this.sourceClient.chain.name} contract address: ${this.contractAddress}...`
+        `Listening to DendrETH Light Client Update from block ${fromBlock} to block ${toBlock} on ${this.targetClient.chain.name} contract address: ${this.contractAddress}...`
       )
 
-      const logs = await this.sourceClient.getContractEvents({
-        address: this.contractAddress,
-        abi: this.abi,
-        eventName: this.eventName,
+      let LCUpdateLogs = await this.targetClient.getContractEvents({
+        address: this.dendrethContractAddress,
+        abi: this.DendrETHAdapterABI,
+        eventName: 'HashStored',
         fromBlock,
         toBlock
       })
 
-      if (logs.length) {
+      if (LCUpdateLogs.length) {
         this.logger.info(
-          `Detected ${logs.length} new ${this.eventName} events on ${this.sourceClient.chain.name}. Processing them ...`
+          `Detected ${LCUpdateLogs.length} new HashStored events on ${this.targetClient.chain.name}. Processing them ...`
         )
-        await this.onLogs(logs)
-        this.logger.info('Events succesfully processed.')
+
+        let latestLCLog = getLatestLCUpdateLog(LCUpdateLogs)
+
+        if (latestLCLog) {
+          // find the MessageDispatched event from the source chain
+          const messageDispatchedLogs = await this.sourceClient.getContractEvents({
+            address: this.yahoContractAddress,
+            abi: this.YahoABI,
+            eventName: 'MessageDispatched',
+            fromBlock: BigInt(latestLCLog.topics[1]) - BigInt(this._maxBlockWindow),
+            toBlock: BigInt(latestLCLog.topics[1])
+          })
+
+          this.logger.info(
+            `Searching for Message Dispatch event from ${
+              BigInt(latestLCLog.topics[1]) - BigInt(this._maxBlockWindow)
+            } to ${BigInt(latestLCLog.topics[1])} on ${this.sourceClient.chain.name}`
+          )
+
+          // Proceed with event proof
+          if (messageDispatchedLogs.length) {
+            this.logger.info(
+              `Found ${messageDispatchedLogs.length} Message Dispatched event on ${this.sourceClient.chain.name}`
+            )
+            if (messageDispatchedLogs.length > this._maxEventToProve && this._maxEventToProve > 0) {
+              // only process maxEventToProve amount of event
+              await this.onLogs(messageDispatchedLogs.slice(0, this._maxEventToProve), this.logger)
+            } else {
+              await this.onLogs(messageDispatchedLogs, this.logger)
+            }
+          }
+        }
+      } else {
+        this.logger.info('No light client update found...')
       }
 
       this._lastBlock = toBlock

@@ -25,22 +25,31 @@ const targetClient = createWalletClient({
   transport: http(process.env.TARGET_RPC ? process.env.TARGET_RPC : '')
 }).extend(publicActions)
 
+// 1. Watch for Hash Stored event on DendrETH Adapter with store block header function call
+//  (no direct way to check the call, but we can check the HashStored event's id if it is a block number)
+// 2. Once get the block number in HashStored, we query the Yaho event from blockNum - maxBlockWindow  to blockNum
+// 3. Get the events and prove
 const relayer = new Relayer({
-  abi: YahoABI,
+  YahoABI,
+  DendrETHAdapterABI,
   sourceClient,
   targetClient,
-  contractAddress: process.env.SOURCE_YAHO_ADDRESS,
-  eventName: 'MessageDispatched',
+  yahoContractAddress: process.env.SOURCE_YAHO_ADDRESS,
+  dendrethContractAddress: process.env.DENDRETH_ADAPTER_ADDRESS,
   logger,
   service: 'DendrETHProver',
   watchIntervalTimeMs: Number(process.env.WATCH_INTERVAL_TIME_MS),
-  requiredBlockConfirmation: Number(process.env.REQUIRED_BLOCK_CONFIRMATION),
-  onLogs: async (_logs) => {
+  maxBlockWindow: Number(process.env.MAX_BLOCK_WINDOW),
+  maxEventToProve: Number(process.env.MAX_EVENT_TO_PROVE),
+  queryFromBlock: Number(process.env.INITIAL_QUERY_FROM_BLOCK),
+
+  onLogs: async (_logs, logger) => {
     // request proof from API
     logger.info(`Processing ${_logs.length} MessageDispatched events`)
     for (let i = 0; i < _logs.length; i++) {
       try {
         let txHash = _logs[i].transactionHash
+        logger.info(`Getting receipt proof for event no.${i}, with tx hash ${txHash} on ${sourceClient.chain.name}...`)
         let { data: proof } = await axios.get(`${process.env.PROOF_API}/${txHash}`)
 
         let { request } = await targetClient.simulateContract({
@@ -50,13 +59,16 @@ const relayer = new Relayer({
           address: process.env.DENDRETH_ADAPTER_ADDRESS,
           args: proof.proof
         })
+        logger.info('Calling verifyAndStoreDispatchMessage with proof...')
 
         let tx = await targetClient.writeContract(request)
-        logger.info(`Event proof successfully verified: ${tx} `)
+        logger.info(`Event proof for tx ${txHash} successfully verified on ${targetClient.chain.name}: tx hash ${tx}`)
       } catch (error) {
         logger.error(error)
       }
     }
+
+    logger.info(`All events successfully processed`)
   }
 })
 

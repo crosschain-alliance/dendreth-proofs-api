@@ -8,4 +8,4 @@ RUN yarn install
 
 COPY  ./packages/server .
 
-CMD ["node", "./src/server.js"]
+CMD ["node", "--max-old-space-size=4096", "./src/server.js"]
