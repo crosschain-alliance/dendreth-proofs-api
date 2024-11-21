@@ -37,7 +37,7 @@ const relayer = new Relayer({
   yahoContractAddress: process.env.SOURCE_YAHO_ADDRESS,
   dendrethContractAddress: process.env.DENDRETH_ADAPTER_ADDRESS,
   logger,
-  service: 'DendrETHProver',
+  service: 'DendrETHRelayer',
   watchIntervalTimeMs: Number(process.env.WATCH_INTERVAL_TIME_MS),
   maxBlockWindow: Number(process.env.MAX_BLOCK_WINDOW),
   maxEventToProve: Number(process.env.MAX_EVENT_TO_PROVE),
