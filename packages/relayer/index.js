@@ -50,7 +50,9 @@ const relayer = new Relayer({
       try {
         let txHash = _logs[i].transactionHash
         logger.info(`Getting receipt proof for event no.${i}, with tx hash ${txHash} on ${sourceClient.chain.name}...`)
-        let { data: proof } = await axios.get(`${process.env.PROOF_API}/${txHash}`)
+        let { data: proof } = await axios.get(`${process.env.PROOF_API}/${txHash}`, {
+          timeout: process.env.SERVER_REQUEST_TIMEOUT
+        })
 
         let { request } = await targetClient.simulateContract({
           account: privateKeyToAccount(process.env.PRIVATE_KEY),
