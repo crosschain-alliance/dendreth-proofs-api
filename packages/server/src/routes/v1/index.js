@@ -7,7 +7,6 @@ import { Tree } from '@chainsafe/persistent-merkle-tree'
 import logger from '../../utils/logger.js'
 import dendrethAbi from '../../utils/abi/dendreth.js'
 import { getBeaconApi, getReceiptProof, getReceiptsRootProof } from '../../utils/proofs.js'
-import sleep from '../../utils/sleep.js'
 
 const MESSAGE_DISPATCHED_TOPIC = '0x218247aabc759e65b5bb92ccc074f9d62cd187259f2a0984c3c9cf91f67ff7cf'
 

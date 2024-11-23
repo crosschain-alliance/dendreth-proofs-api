@@ -8,9 +8,12 @@ DendrETH proof API Relayer is facilitating with the API server to fetch proof of
 2. Once get the block number in `HashStored`, we query the Yaho `MessageDispatched` event from blockNum - maxBlockWindow to blockNum, on source chain.
 3. Get the event proof from API server and call `verifyAndStoreDispatchedMessage` on DendrETH Adapter on target chain.
 
+# Dev
+
 Install the dependencies using Yarn:
 
 ```bash
+cd ../.. # at root level
 yarn install
 ```
 
@@ -21,6 +24,7 @@ yarn install
 To start the application in development mode with hot-reloading, use the following command:
 
 ```bash
+cd packages/relayer
 yarn start:dev
 ```
 
@@ -31,5 +35,6 @@ This command typically runs the server using a development configuration, where 
 To start the application in production mode, use:
 
 ```bash
+cd packages/relayer
 yarn start
 ```

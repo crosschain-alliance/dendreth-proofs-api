@@ -4,7 +4,7 @@ WORKDIR /usr/src/app/
 
 # Copy root package.json and yarn.lock
 COPY ./package.json ./yarn.lock ./
-COPY ./packages/server/package.json ./packages/server/yarn.lock ./packages/server/
+COPY ./packages/server/package.json ./packages/server/
 
 
 # Install dependencies for the entire monorepo
