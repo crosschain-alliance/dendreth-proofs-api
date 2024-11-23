@@ -1,4 +1,4 @@
-import { getLatestLCUpdateLog } from './utils.js'
+import { getLatestLCUpdateLog, waitForServer } from './utils.js'
 class Relayer {
   logger
   onLogs
@@ -22,6 +22,7 @@ class Relayer {
     this.YahoABI = _configs.YahoABI
     this.DendrETHAdapterABI = _configs.DendrETHAdapterABI
     this.onLogs = _configs.onLogs
+    this.proverURL = _configs.proverURL
     this._watchIntervalTimeMs = _configs.watchIntervalTimeMs
     this._lastBlock = _configs.queryFromBlock ? _configs.queryFromBlock : '0'
     this._maxBlockWindow = _configs.maxBlockWindow
@@ -29,6 +30,7 @@ class Relayer {
   }
 
   async start() {
+    await waitForServer(this.proverURL)
     try {
       this._watch()
       setInterval(() => {

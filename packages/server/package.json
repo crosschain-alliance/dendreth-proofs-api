@@ -18,13 +18,8 @@
     "@lodestar/api": "^1.21.0",
     "@lodestar/config": "^1.21.0",
     "@lodestar/types": "^1.21.0",
-    "axios": "^1.6.8",
-    "dotenv": "^16.4.5",
     "fastify": "^4.26.2",
-    "node-fetch": "^3.3.2",
-    "pino": "^8.19.0",
-    "pino-pretty": "^11.0.0",
-    "viem": "^2.9.9"
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",

@@ -42,6 +42,7 @@ const relayer = new Relayer({
   maxBlockWindow: Number(process.env.MAX_BLOCK_WINDOW),
   maxEventToProve: Number(process.env.MAX_EVENT_TO_PROVE),
   queryFromBlock: Number(process.env.INITIAL_QUERY_FROM_BLOCK),
+  proverURL: process.env.PROOF_API,
 
   onLogs: async (_logs, logger) => {
     // request proof from API
@@ -50,7 +51,7 @@ const relayer = new Relayer({
       try {
         let txHash = _logs[i].transactionHash
         logger.info(`Getting receipt proof for event no.${i}, with tx hash ${txHash} on ${sourceClient.chain.name}...`)
-        let { data: proof } = await axios.get(`${process.env.PROOF_API}/${txHash}`, {
+        let { data: proof } = await axios.get(`${process.env.PROOF_API}/v1/get-message-dispatched-proof/${txHash}`, {
           timeout: process.env.SERVER_REQUEST_TIMEOUT
         })
 

@@ -27,4 +27,20 @@ const getLatestLCUpdateLog = (LCUpdateLogs) => {
   return latestLog
 }
 
-export { jsonStringify, getLatestLCUpdateLog }
+const waitForServer = async (url, retries = 5, interval = 2000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const response = await fetch(url) // or another request method
+      if (response.ok) {
+        console.log('Server is ready!')
+        return
+      }
+    } catch (err) {
+      console.log(`Server not ready, retrying in ${interval}ms...`)
+    }
+    await new Promise((res) => setTimeout(res, interval))
+  }
+  throw new Error('Server did not become ready in time')
+}
+
+export { jsonStringify, getLatestLCUpdateLog, waitForServer }

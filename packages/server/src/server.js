@@ -10,6 +10,15 @@ const fastify = Fastify({
   exposeHeadRoutes: true
 })
 
+// Add root route for liveness/readiness check
+fastify.route({
+  method: 'GET',
+  url: '/',
+  handler: async (_request, reply) => {
+    reply.code(200).send({ status: 'ok', message: 'Server is live and ready!' })
+  }
+})
+
 const port = process.env.PORT || 3002
 
 fastify.route({
