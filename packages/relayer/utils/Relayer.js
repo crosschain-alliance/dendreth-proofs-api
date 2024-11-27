@@ -1,4 +1,5 @@
 import { getLatestLCUpdateLog, waitForServer } from './utils.js'
+import axios from 'axios'
 class Relayer {
   logger
   onLogs
@@ -8,19 +9,23 @@ class Relayer {
   dendrethContractAddress
   YahoABI
   DendrETHAdapterABI
+  HeliosLightClientABI
   _lastBlock
   _watchIntervalTimeMs
   _maxBlockWindow
   _maxEventToProve
 
   constructor(_configs) {
+    this.lcType = _configs.lcType.toLowerCase()
     this.logger = _configs.logger.child({ service: _configs.service })
     this.sourceClient = _configs.sourceClient
     this.targetClient = _configs.targetClient
     this.yahoContractAddress = _configs.yahoContractAddress
-    this.dendrethContractAddress = _configs.dendrethContractAddress
+    this.dendrethAdapterContractAddress = _configs.dendrethAdapterContractAddress
+    this.heliosAdapterContractAddress = _configs.heliosAdapterContractAddress
     this.YahoABI = _configs.YahoABI
     this.DendrETHAdapterABI = _configs.DendrETHAdapterABI
+    this.HeliosAdapterABI = _configs.HeliosAdapterABI
     this.onLogs = _configs.onLogs
     this.proverURL = _configs.proverURL
     this._watchIntervalTimeMs = _configs.watchIntervalTimeMs
@@ -59,16 +64,29 @@ class Relayer {
       }
 
       this.logger.info(
-        `Listening to DendrETH Light Client Update from block ${fromBlock} to block ${toBlock} on ${this.targetClient.chain.name} contract address: ${this.dendrethContractAddress}...`
+        `Listening to ${this.lcType.toLowerCase()} Light Client Update from block ${fromBlock} to block ${toBlock} on ${this.targetClient.chain.name} contract address: ${this.dendrethContractAddress}...`
       )
 
-      let LCUpdateLogs = await this.targetClient.getContractEvents({
-        address: this.dendrethContractAddress,
-        abi: this.DendrETHAdapterABI,
-        eventName: 'HashStored',
-        fromBlock,
-        toBlock
-      })
+      let LCUpdateLogs
+      if (this.lcType.toLowerCase() == 'dendreth') {
+        LCUpdateLogs = await this.targetClient.getContractEvents({
+          address: this.dendrethContractAddress,
+          abi: this.DendrETHAdapterABI,
+          eventName: 'HashStored',
+          fromBlock,
+          toBlock
+        })
+      } else if (this.lcType.toLowerCase() == 'helios') {
+        LCUpdateLogs = await this.targetClient.getContractEvents({
+          address: this.heliosAdapterContractAddress,
+          abi: this.HeliosAdapterABI,
+          eventName: 'HashStored',
+          fromBlock, // TODO: change to `0x${fromBlock.toString(16)}` if target chain is LUKSO. (LUKSO rpc requires both fromBlock, toBlock to be hex string. However, fromBlock is uint by default)
+          toBlock
+        })
+      } else {
+        this.logger.error('Incorrect Light Client Type')
+      }
 
       if (LCUpdateLogs.length) {
         this.logger.info(

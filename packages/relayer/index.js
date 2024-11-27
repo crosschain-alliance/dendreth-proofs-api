@@ -8,6 +8,8 @@ import * as chains from 'viem/chains'
 import Relayer from './utils/Relayer.js'
 import YahoABI from './utils/YahoABI.js'
 import DendrETHAdapterABI from './utils/DendrETHAdapterABI.js'
+import HeliosLightClientABI from './utils/HeliosLightClient.js'
+import HeliosAdapterABI from './utils/HeliosAdapter.js'
 import logger from './utils/Logger.js'
 
 const sourceChain = Object.values(chains).find(({ id }) => id.toString() === process.env.SOURCE_CHAIN_ID)
@@ -31,12 +33,15 @@ const targetClient = createWalletClient({
 // 2. Once get the block number in HashStored, we query the Yaho event from blockNum - maxBlockWindow  to blockNum
 // 3. Get the events and prove
 const relayer = new Relayer({
+  lcType: process.env.LC_TYPE,
   YahoABI,
   DendrETHAdapterABI,
+  HeliosAdapterABI,
   sourceClient,
   targetClient,
   yahoContractAddress: process.env.SOURCE_YAHO_ADDRESS,
-  dendrethContractAddress: process.env.DENDRETH_ADAPTER_ADDRESS,
+  dendrethAdapterContractAddress: process.env.DENDRETH_ADAPTER_ADDRESS || '',
+  heliosAdapterContractAddress: process.env.HELIOS_ADAPTER_ADDRESS || '',
   logger,
   service: 'DendrETHRelayer',
   watchIntervalTimeMs: Number(process.env.WATCH_INTERVAL_TIME_MS),
@@ -52,15 +57,21 @@ const relayer = new Relayer({
       try {
         let txHash = _logs[i].transactionHash
         logger.info(`Getting receipt proof for event no.${i}, with tx hash ${txHash} on ${sourceClient.chain.name}...`)
-        let { data: proof } = await axios.get(`${process.env.PROOF_API}/v1/get-message-dispatched-proof/${txHash}`, {
-          timeout: process.env.SERVER_REQUEST_TIMEOUT
-        })
+        let { data: proof } = await axios.get(
+          `${process.env.PROOF_API}/v1/get-message-dispatched-proof/${process.env.LC_TYPE.toLowerCase()}/${txHash}`,
+          {
+            timeout: process.env.SERVER_REQUEST_TIMEOUT
+          }
+        )
 
         let { request } = await targetClient.simulateContract({
           account: privateKeyToAccount(process.env.PRIVATE_KEY),
-          abi: DendrETHAdapterABI,
+          abi: process.env.LC_TYPE.toLowerCase() == 'dendreth' ? DendrETHAdapterABI : HeliosAdapterABI,
           functionName: 'verifyAndStoreDispatchedMessage',
-          address: process.env.DENDRETH_ADAPTER_ADDRESS,
+          address:
+            process.env.LC_TYPE.toLowerCase() == 'dendreth'
+              ? process.env.DENDRETH_ADAPTER_ADDRESS
+              : process.env.HELIOS_ADAPTER_ADDRESS,
           args: proof.proof
         })
         logger.info('Calling verifyAndStoreDispatchMessage with proof...')
