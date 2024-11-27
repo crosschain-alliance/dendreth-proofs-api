@@ -5,13 +5,15 @@ import axios from 'axios'
 import { RLP } from '@ethereumjs/rlp'
 import { Tree } from '@chainsafe/persistent-merkle-tree'
 import logger from '../../utils/logger.js'
-import dendrethAbi from '../../utils/abi/dendreth.js'
+import dendrethLightClientAbi from '../../utils/abi/dendreth.js'
+import heliosLightClientAbi from '../../utils/abi/helios.js'
 import { getBeaconApi, getReceiptProof, getReceiptsRootProof } from '../../utils/proofs.js'
+import { fetchBlockHeaderProof } from '../../utils/blockHeader.js'
 
 const MESSAGE_DISPATCHED_TOPIC = '0x218247aabc759e65b5bb92ccc074f9d62cd187259f2a0984c3c9cf91f67ff7cf'
 
 const getMessageDispatchedProof = async (_request, _reply) => {
-  const { transactionHash } = _request.params
+  const { transactionHash, lcType } = _request.params
 
   const sourceChain = Object.values(chains).find((_chain) => _chain.id === parseInt(process.env.SOURCE_CHAIN_ID))
   const targetChain = Object.values(chains).find((_chain) => _chain.id === parseInt(process.env.TARGET_CHAIN_ID))
@@ -82,21 +84,39 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   const { receiptProof, receiptsRoot } = await getReceiptProof(transactionHash, sourceClient)
 
   logger.info('Getting the correct light client slot ...')
-  // NOTE: find the first slot > transactionSlot
-  const initialIndex = await targetClient.readContract({
-    address: process.env.LC_ADDRESS,
-    abi: dendrethAbi,
-    functionName: 'currentIndex'
-  })
-  let currentIndex = initialIndex
-  let inverted = false
 
-  const lightClientFinalizedHeader = await targetClient.readContract({
-    address: process.env.LC_ADDRESS,
-    abi: dendrethAbi,
-    functionName: 'finalizedHeaders',
-    args: [currentIndex]
-  })
+  let lightClientFinalizedHeader
+
+  if (lcType == 'dendreth') {
+    const initialIndex = await targetClient.readContract({
+      address: process.env.LC_ADDRESS,
+      abi: dendrethLightClientAbi,
+      functionName: 'currentIndex'
+    })
+    let currentIndex = initialIndex
+
+    lightClientFinalizedHeader = await targetClient.readContract({
+      address: process.env.LC_ADDRESS,
+      abi: dendrethLightClientAbi,
+      functionName: 'finalizedHeaders',
+      args: [currentIndex]
+    })
+  } else if (lcType == 'helios') {
+    // Helios Light Client
+    const head = await targetClient.readContract({
+      address: process.env.LC_ADDRESS,
+      abi: heliosLightClientAbi,
+      functionName: 'head'
+    })
+    let currentIndex = head
+
+    lightClientFinalizedHeader = await targetClient.readContract({
+      address: process.env.LC_ADDRESS,
+      abi: heliosLightClientAbi,
+      functionName: 'headers',
+      args: [currentIndex]
+    })
+  }
 
   let chainConfig
   let api
@@ -134,8 +154,8 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   }
 
   const proof = [
-    lightClientFinalizedHeader,
-    parseInt(lightClientSlot),
+    lcType == 'dendreth' ? lightClientFinalizedHeader : parseInt(head),
+    lcType == 'dendreth' ? parseInt(lightClientSlot) : parseInt(head),
     lightClientSlotProof,
     parseInt(transactionSlot),
     receiptsRootProof,
@@ -150,8 +170,29 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   })
 }
 
+const getBlockHeaderProof = async (_request, _reply) => {
+  const { slot } = _request.params
+
+  logger.info(`Getting block header proof for slot ${slot}`)
+  const sourceChain = Object.values(chains).find((_chain) => _chain.id === parseInt(process.env.SOURCE_CHAIN_ID))
+
+  const blockHeaderProof = await fetchBlockHeaderProof(slot, sourceChain, [process.env.SOURCE_BEACON_API_URL])
+
+  const proof = [
+    blockHeaderProof.slot,
+    blockHeaderProof.blockNumber,
+    blockHeaderProof.blockNumberProof,
+    blockHeaderProof.blockHash,
+    blockHeaderProof.blockHashProof
+  ]
+
+  _reply.send({
+    proof
+  })
+}
 const handler = (_fastify, _opts, _done) => {
-  _fastify.get('/get-message-dispatched-proof/:transactionHash', getMessageDispatchedProof)
+  _fastify.get(`/get-block-header-proof/:slot`, getBlockHeaderProof)
+  _fastify.get('/get-message-dispatched-proof/:lcType/:transactionHash', getMessageDispatchedProof)
   _done()
 }
 
