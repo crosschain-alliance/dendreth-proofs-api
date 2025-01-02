@@ -1,5 +1,7 @@
+import { toHex } from 'viem'
 import { getLatestLCUpdateLog, waitForServer } from './utils.js'
-class Relayer {
+
+export default class EventListener {
   logger
   onLogs
   sourceClient
@@ -8,6 +10,7 @@ class Relayer {
   dendrethContractAddress
   YahoABI
   DendrETHAdapterABI
+  sendToMessageDispatchEventQueue
   _lastBlock
   _watchIntervalTimeMs
   _maxBlockWindow
@@ -23,6 +26,7 @@ class Relayer {
     this.DendrETHAdapterABI = _configs.DendrETHAdapterABI
     this.onLogs = _configs.onLogs
     this.proverURL = _configs.proverURL
+    this.sendToMessageDispatchEventQueue = _configs.sendToMessageDispatchEventQueue
     this._watchIntervalTimeMs = _configs.watchIntervalTimeMs
     this._lastBlock = _configs.queryFromBlock ? _configs.queryFromBlock : '0'
     this._maxBlockWindow = _configs.maxBlockWindow
@@ -66,8 +70,8 @@ class Relayer {
         address: this.dendrethContractAddress,
         abi: this.DendrETHAdapterABI,
         eventName: 'HashStored',
-        fromBlock,
-        toBlock
+        fromBlock: toHex(fromBlock),
+        toBlock: toHex(toBlock)
       })
 
       if (LCUpdateLogs.length) {
@@ -100,9 +104,13 @@ class Relayer {
             )
             if (messageDispatchedLogs.length > this._maxEventToProve && this._maxEventToProve > 0) {
               // only process maxEventToProve amount of event
-              await this.onLogs(messageDispatchedLogs.slice(0, this._maxEventToProve), this.logger)
+              await this.onLogs(
+                messageDispatchedLogs.slice(0, this._maxEventToProve),
+                this.logger,
+                this.sendToMessageDispatchEventQueue
+              )
             } else {
-              await this.onLogs(messageDispatchedLogs, this.logger)
+              await this.onLogs(messageDispatchedLogs, this.logger, this.sendToMessageDispatchEventQueue)
             }
           }
         }
@@ -116,5 +124,3 @@ class Relayer {
     }
   }
 }
-
-export default Relayer

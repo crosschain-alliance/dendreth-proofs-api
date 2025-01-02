@@ -9,6 +9,7 @@ COPY ./packages/server/package.json ./packages/server/
 
 # Install dependencies for the entire monorepo
 RUN yarn install --production=false
+RUN yarn postinstall
 
 # Copy only the server workspace
 COPY packages/server ./packages/server

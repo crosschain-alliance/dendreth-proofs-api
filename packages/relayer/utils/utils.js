@@ -27,7 +27,7 @@ const getLatestLCUpdateLog = (LCUpdateLogs) => {
   return latestLog
 }
 
-const waitForServer = async (url, retries = 5, interval = 2000) => {
+const waitForServer = async (url, retries = 5, interval = 10000) => {
   for (let i = 0; i < retries; i++) {
     try {
       const response = await fetch(url) // or another request method

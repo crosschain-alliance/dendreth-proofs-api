@@ -83,37 +83,89 @@ const getMessageDispatchedProof = async (_request, _reply) => {
 
   logger.info('Getting the correct light client slot ...')
   // NOTE: find the first slot > transactionSlot
-  const initialIndex = await targetClient.readContract({
-    address: process.env.LC_ADDRESS,
-    abi: dendrethAbi,
-    functionName: 'currentIndex'
-  })
-  let currentIndex = initialIndex
-  let inverted = false
 
-  const lightClientFinalizedHeader = await targetClient.readContract({
-    address: process.env.LC_ADDRESS,
-    abi: dendrethAbi,
-    functionName: 'finalizedHeaders',
-    args: [currentIndex]
-  })
+  // TODO: Remove comment
+  //   const initialIndex = await targetClient.readContract({
+  //     address: process.env.LC_ADDRESS,
+  //     abi: dendrethAbi,
+  //     functionName: 'currentIndex'
+  //   })
+  //   let currentIndex = initialIndex
+  //   let inverted = false
+
+  //   const lightClientFinalizedHeader = await targetClient.readContract({
+  //     address: process.env.LC_ADDRESS,
+  //     abi: dendrethAbi,
+  //     functionName: 'finalizedHeaders',
+  //     args: [currentIndex]
+  //   })
 
   let chainConfig
   let api
   let config
   ;({ api, config, chainConfig } = getBeaconApi(sourceChain, chainConfig, [process.env.SOURCE_BEACON_API_URL]))
 
-  let finalizedBlockHeader = (await api.beacon.getBlockHeader({ blockId: lightClientFinalizedHeader })).value()
-  let lightClientSlot = finalizedBlockHeader.header.message.slot
-  const finalizedBlockHeaderView = config
-    .getForkTypes(lightClientSlot)
-    .BeaconBlockHeader.toViewDU(finalizedBlockHeader.header.message)
+  //   let finalizedBlockHeader = (await api.beacon.getBlockHeader({ blockId: lightClientFinalizedHeader })).value()
 
-  let finalizedBlockHeaderTree = new Tree(finalizedBlockHeaderView.node)
+  //   let lightClientSlot = finalizedBlockHeader.header.message.slot
+  //   const finalizedBlockHeaderView = config
+  //     .getForkTypes(lightClientSlot)
+  //     .BeaconBlockHeader.toViewDU(finalizedBlockHeader.header.message)
 
-  const lightClientSlotProof = finalizedBlockHeaderTree.getSingleProof(8).map(bytesToHex)
+  //   let finalizedBlockHeaderTree = new Tree(finalizedBlockHeaderView.node)
+
+  //   const lightClientSlotProof = finalizedBlockHeaderTree.getSingleProof(8).map(bytesToHex)
 
   logger.info('Getting receipts root proof ...')
+
+  // TODO: delete
+  const latestSlotIndex = await targetClient.readContract({
+    address: process.env.DENDRETH_ADAPTER_ADDRESS,
+    abi: [
+      {
+        inputs: [],
+        name: 'SLOT_INDEX',
+        outputs: [
+          {
+            internalType: 'uint256',
+            name: '',
+            type: 'uint256'
+          }
+        ],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ],
+    functionName: 'SLOT_INDEX'
+  })
+
+  const lightClientSlot = await targetClient.readContract({
+    address: process.env.DENDRETH_ADAPTER_ADDRESS,
+    abi: [
+      {
+        inputs: [
+          {
+            internalType: 'uint256',
+            name: 'slotIndex',
+            type: 'uint256'
+          }
+        ],
+        name: 'slotIndexToSlotNumber',
+        outputs: [
+          {
+            internalType: 'uint256',
+            name: 'slotNumber',
+            type: 'uint256'
+          }
+        ],
+        stateMutability: 'view',
+        type: 'function'
+      }
+    ],
+    functionName: 'slotIndexToSlotNumber',
+    args: [latestSlotIndex - 1n]
+  })
+
   const { receiptsRootProof, receiptsRoot: receiptsRootFromSlot } = await getReceiptsRootProof(
     Number(lightClientSlot),
     Number(transactionSlot),
@@ -133,10 +185,13 @@ const getMessageDispatchedProof = async (_request, _reply) => {
     return _reply.code(404).send({ error: 'Log not found' })
   }
 
+  // lightClientFinalizedHeader: the block root of the beacon block, stored on light client contract, it is not the execution block hash
+  // lightClientSlot: the corresponding slot
+  // execution block's block hash is stored in adapter contract
   const proof = [
-    lightClientFinalizedHeader,
-    parseInt(lightClientSlot),
-    lightClientSlotProof,
+    // lightClientFinalizedHeader,
+    // parseInt(lightClientSlot),
+    // lightClientSlotProof,
     parseInt(transactionSlot),
     receiptsRootProof,
     receiptsRoot,
