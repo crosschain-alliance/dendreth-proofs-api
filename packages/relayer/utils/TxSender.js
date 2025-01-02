@@ -1,15 +1,12 @@
-// consume tx_to_send_queue
-// fetch proof result from redis
-// simulate the contract
-// TODO: batching txs
-
 import amqp from 'amqplib'
 import 'dotenv/config'
-import redisClient from './redisClient.js'
-import logger from './Logger.js'
 import { parseAbiItem } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import redisClient from './redisClient.js'
 
+// 1. consume tx_to_send_queue
+// 2. send proof to contract
+// TODO: batching txs
 export default class TxSender {
   consumeQueueName
   amqpConnection

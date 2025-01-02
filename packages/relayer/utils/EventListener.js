@@ -1,6 +1,10 @@
 import { toHex } from 'viem'
 import { getLatestLCUpdateLog, waitForServer } from './utils.js'
 
+// 1. Watch for Hash Stored event on DendrETH Adapter with store block header function call
+//  (no direct way to check the call, but we can check the HashStored event's id if it is a block number)
+// 2. Once get the block number in HashStored, we query the Yaho event from blockNum - maxBlockWindow  to blockNum
+// 3. Get the events and push to message_dispatch_event_queue
 export default class EventListener {
   logger
   onLogs

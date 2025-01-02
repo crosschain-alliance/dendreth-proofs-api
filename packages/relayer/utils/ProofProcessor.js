@@ -4,9 +4,9 @@ import axios from 'axios'
 import axiosRetry from 'axios-retry'
 import redisClient from './redisClient.js'
 
-// consume the queue from event channel
-// send request to server and wait for response, 1 at a time (prefetch(1))
-// send the proof result to redis server and sender queue
+// 1. consume message_dispatch_event_queue
+// 2. call proof server (logic in packages/server)
+// 3. Push the proof into redis and tx_to_send_queue
 
 export default class ProofProcessor {
   consumeQueueName
