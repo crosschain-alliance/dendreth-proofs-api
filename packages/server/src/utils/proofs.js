@@ -167,8 +167,6 @@ export const fetchBlockHeaderProof = async (slot, _sourceChain, _urls) => {
     blockId: slot
   })
 
-  const beaconBlock = currentBlock
-
   const beaconBlockView = config.getForkTypes(slot).BeaconBlock.toView(currentBlock.value().message)
 
   const beaconBlockTree = new Tree(beaconBlockView.node)

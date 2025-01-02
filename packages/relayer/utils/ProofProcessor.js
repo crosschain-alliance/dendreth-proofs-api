@@ -36,22 +36,31 @@ export default class ProofProcessor {
         let txHash = msg.content.toString()
 
         this.logger.info(`Fetching proof for tx hash  ${txHash}`)
-        axiosRetry(axios, { retries: 2 })
-        let { data: proof } = await axios.get(`${process.env.PROOF_API}/v1/get-message-dispatched-proof/${txHash}`, {
-          timeout: process.env.SERVER_REQUEST_TIMEOUT
-        })
+        try {
+          axiosRetry(axios, { retries: 2 })
+          let { data: proof } = await axios.get(
+            `${process.env.PROOF_API}/v1/get-message-dispatched-proof/${process.env.LC_TYPE}/${txHash}`,
+            {
+              timeout: process.env.SERVER_REQUEST_TIMEOUT
+            }
+          )
 
-        let proofResult = proof.proof
+          let proofResult = proof.proof
 
-        this.logger.info(`Writing into redis for tx hash ${txHash}`)
-        const result = {
-          proof: proofResult
+          this.logger.info(`${txHash} with proof ${proofResult}`)
+
+          this.logger.info(`Writing into redis for tx hash ${txHash}`)
+          const result = {
+            proof: proofResult
+          }
+
+          await redisClient.set(txHash, JSON.stringify(result))
+          this.sendToTxSenderQueue(Buffer.from(txHash))
+
+          channel.ack(msg)
+        } catch (err) {
+          this.logger.error(err)
         }
-
-        await redisClient.set(txHash, JSON.stringify(result))
-        this.sendToTxSenderQueue(Buffer.from(txHash))
-
-        channel.ack(msg)
       },
       { noAck: false }
     )

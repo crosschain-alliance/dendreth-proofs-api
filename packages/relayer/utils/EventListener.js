@@ -1,4 +1,5 @@
-import { toHex } from 'viem'
+import { toHex, hexToNumber } from 'viem'
+import axios from 'axios'
 import { getLatestLCUpdateLog, waitForServer } from './utils.js'
 
 // 1. Watch for Hash Stored event on DendrETH Adapter with store block header function call
@@ -6,14 +7,15 @@ import { getLatestLCUpdateLog, waitForServer } from './utils.js'
 // 2. Once get the block number in HashStored, we query the Yaho event from blockNum - maxBlockWindow  to blockNum
 // 3. Get the events and push to message_dispatch_event_queue
 export default class EventListener {
+  lightClientType
   logger
   onLogs
   sourceClient
   targetClient
   yahoContractAddress
-  dendrethContractAddress
+  lightClientContractAddress
   YahoABI
-  DendrETHAdapterABI
+  lightClientAdapterABI
   sendToMessageDispatchEventQueue
   _lastBlock
   _watchIntervalTimeMs
@@ -22,12 +24,13 @@ export default class EventListener {
 
   constructor(_configs) {
     this.logger = _configs.logger.child({ service: _configs.service })
+    this.lightClientType = _configs.lightClientType
     this.sourceClient = _configs.sourceClient
     this.targetClient = _configs.targetClient
     this.yahoContractAddress = _configs.yahoContractAddress
-    this.dendrethContractAddress = _configs.dendrethContractAddress
+    this.lightClientContractAddress = _configs.lightClientContractAddress
     this.YahoABI = _configs.YahoABI
-    this.DendrETHAdapterABI = _configs.DendrETHAdapterABI
+    this.lightClientAdapterABI = _configs.lightClientAdapterABI
     this.onLogs = _configs.onLogs
     this.proverURL = _configs.proverURL
     this.sendToMessageDispatchEventQueue = _configs.sendToMessageDispatchEventQueue
@@ -67,38 +70,58 @@ export default class EventListener {
       }
 
       this.logger.info(
-        `Listening to DendrETH Light Client Update from block ${fromBlock} to block ${toBlock} on ${this.targetClient.chain.name} contract address: ${this.dendrethContractAddress}...`
+        `Listening to ${this.lightClientType} Light Client Update from block ${fromBlock} to block ${toBlock} on ${this.targetClient.chain.name} contract address: ${this.lightClientContractAddress}...`
       )
 
+      let eventToListen = this.lightClientType == 'dendreth' ? 'HashStored' : 'HeadUpdate'
       let LCUpdateLogs = await this.targetClient.getContractEvents({
-        address: this.dendrethContractAddress,
-        abi: this.DendrETHAdapterABI,
-        eventName: 'HashStored',
+        address: this.lightClientContractAddress,
+        abi: this.lightClientAdapterABI,
+        eventName: eventToListen,
         fromBlock: toHex(fromBlock),
         toBlock: toHex(toBlock)
       })
 
       if (LCUpdateLogs.length) {
         this.logger.info(
-          `Detected ${LCUpdateLogs.length} new HashStored events on ${this.targetClient.chain.name}. Processing them ...`
+          `Detected ${LCUpdateLogs.length} new ${eventToListen} events on ${this.targetClient.chain.name}. Processing them ...`
         )
 
         let latestLCLog = getLatestLCUpdateLog(LCUpdateLogs)
 
         if (latestLCLog) {
+          // TODO:
+          // for DendrETH, latestLCLog.topics[1] is the block number
+          // for Helios, latestLCLog.topics[1] is the slot number, need to find the corresponding block number
+
+          let fromBlock
+          let toBlock
+
+          if (this.lightClientType == 'helios') {
+            this.logger.info(`Slot ${hexToNumber(latestLCLog.topics[1])}}`)
+
+            const {
+              data: { data }
+            } = await axios.get(`${process.env.BEACONCHA_IN_URL}/api/v1/slot/${hexToNumber(latestLCLog.topics[1])}`)
+
+            this.logger.info(`Data from block ${data}`)
+            fromBlock = data.exec_block_number - this._maxBlockWindow
+            toBlock = data.exec_block_number
+          } else if (this.lightClientType == 'dendreth') {
+            fromBlock = BigInt(latestLCLog.topics[1]) - BigInt(this._maxBlockWindow)
+            toBlock = BigInt(latestLCLog.topics[1])
+          }
           // find the MessageDispatched event from the source chain
           const messageDispatchedLogs = await this.sourceClient.getContractEvents({
             address: this.yahoContractAddress,
             abi: this.YahoABI,
             eventName: 'MessageDispatched',
-            fromBlock: BigInt(latestLCLog.topics[1]) - BigInt(this._maxBlockWindow),
-            toBlock: BigInt(latestLCLog.topics[1])
+            fromBlock,
+            toBlock
           })
 
           this.logger.info(
-            `Searching for Message Dispatch event from ${
-              BigInt(latestLCLog.topics[1]) - BigInt(this._maxBlockWindow)
-            } to ${BigInt(latestLCLog.topics[1])} on ${this.sourceClient.chain.name}`
+            `Searching for Message Dispatch event from ${fromBlock} to ${toBlock} on ${this.sourceClient.chain.name}`
           )
 
           // Proceed with event proof
