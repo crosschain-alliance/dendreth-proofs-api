@@ -25,27 +25,7 @@ export const getReceiptsRootProof = async (_srcSlot, _targetSlot, _urls, _source
   const rootPath = ['block_roots', _targetSlot % SLOTS_PER_HISTORICAL_ROOT]
   const receiptPath = ['body', 'execution_payload', 'receipts_root']
 
-  if (_srcSlot == _targetSlot) {
-    const oldBlockRes = await api.beacon.getBlockV2({
-      blockId: _targetSlot
-    })
-
-    const oldBlockView = config.getForkTypes(_srcSlot).BeaconBlock.toView(oldBlockRes.value().message)
-
-    const oldBlockProof = oldBlockView.createProof([receiptPath])
-
-    const oldBlockTree = Tree.createFromProof(oldBlockProof)
-    const receiptProof = oldBlockTree.getProof({
-      type: ProofType.single,
-      gindex: RECEIPT_INDEX
-    })
-
-    receiptsRootProof = receiptProof.witnesses
-      .concat(rootProof.witnesses)
-      .concat(stateRootProof.witnesses)
-      .map(bytesToHex)
-    receiptsRoot = toHexString(receiptProof.leaf)
-  } else if (_srcSlot - _targetSlot < SLOTS_PER_HISTORICAL_ROOT) {
+  if (_srcSlot - _targetSlot < SLOTS_PER_HISTORICAL_ROOT || _srcSlot == _targetSlot) {
     const STATE_INDEX = config.getForkTypes(_srcSlot).BeaconBlockHeader.getPathInfo(statePath).gindex
 
     const ROOT_INDEX = config.getForkTypes(_srcSlot).BeaconState.getPathInfo(rootPath).gindex
@@ -246,7 +226,10 @@ export function getBeaconApi(_sourceChain, chainConfig, _urls) {
 
   const api = getClient(
     {
-      urls: _urls
+      urls: _urls,
+      retries: 3, // Number of retries
+      retryDelay: 1000, // Delay between retries (1 second)
+      timeoutMs: 500_000
     },
     {
       config

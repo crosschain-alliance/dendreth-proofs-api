@@ -1,6 +1,11 @@
+import { toHex } from 'viem'
 import { getLatestLCUpdateLog, waitForServer } from './utils.js'
-import axios from 'axios'
-class Relayer {
+
+// 1. Watch for Hash Stored event on DendrETH Adapter with store block header function call
+//  (no direct way to check the call, but we can check the HashStored event's id if it is a block number)
+// 2. Once get the block number in HashStored, we query the Yaho event from blockNum - maxBlockWindow  to blockNum
+// 3. Get the events and push to message_dispatch_event_queue
+export default class EventListener {
   logger
   onLogs
   sourceClient
@@ -9,25 +14,23 @@ class Relayer {
   dendrethContractAddress
   YahoABI
   DendrETHAdapterABI
-  HeliosLightClientABI
+  sendToMessageDispatchEventQueue
   _lastBlock
   _watchIntervalTimeMs
   _maxBlockWindow
   _maxEventToProve
 
   constructor(_configs) {
-    this.lcType = _configs.lcType.toLowerCase()
     this.logger = _configs.logger.child({ service: _configs.service })
     this.sourceClient = _configs.sourceClient
     this.targetClient = _configs.targetClient
     this.yahoContractAddress = _configs.yahoContractAddress
-    this.dendrethAdapterContractAddress = _configs.dendrethAdapterContractAddress
-    this.heliosAdapterContractAddress = _configs.heliosAdapterContractAddress
+    this.dendrethContractAddress = _configs.dendrethContractAddress
     this.YahoABI = _configs.YahoABI
     this.DendrETHAdapterABI = _configs.DendrETHAdapterABI
-    this.HeliosAdapterABI = _configs.HeliosAdapterABI
     this.onLogs = _configs.onLogs
     this.proverURL = _configs.proverURL
+    this.sendToMessageDispatchEventQueue = _configs.sendToMessageDispatchEventQueue
     this._watchIntervalTimeMs = _configs.watchIntervalTimeMs
     this._lastBlock = _configs.queryFromBlock ? _configs.queryFromBlock : '0'
     this._maxBlockWindow = _configs.maxBlockWindow
@@ -64,29 +67,16 @@ class Relayer {
       }
 
       this.logger.info(
-        `Listening to ${this.lcType.toLowerCase()} Light Client Update from block ${fromBlock} to block ${toBlock} on ${this.targetClient.chain.name} contract address: ${this.dendrethContractAddress}...`
+        `Listening to DendrETH Light Client Update from block ${fromBlock} to block ${toBlock} on ${this.targetClient.chain.name} contract address: ${this.dendrethContractAddress}...`
       )
 
-      let LCUpdateLogs
-      if (this.lcType.toLowerCase() == 'dendreth') {
-        LCUpdateLogs = await this.targetClient.getContractEvents({
-          address: this.dendrethContractAddress,
-          abi: this.DendrETHAdapterABI,
-          eventName: 'HashStored',
-          fromBlock,
-          toBlock
-        })
-      } else if (this.lcType.toLowerCase() == 'helios') {
-        LCUpdateLogs = await this.targetClient.getContractEvents({
-          address: this.heliosAdapterContractAddress,
-          abi: this.HeliosAdapterABI,
-          eventName: 'HashStored',
-          fromBlock, // TODO: change to `0x${fromBlock.toString(16)}` if target chain is LUKSO. (LUKSO rpc requires both fromBlock, toBlock to be hex string. However, fromBlock is uint by default)
-          toBlock
-        })
-      } else {
-        this.logger.error('Incorrect Light Client Type')
-      }
+      let LCUpdateLogs = await this.targetClient.getContractEvents({
+        address: this.dendrethContractAddress,
+        abi: this.DendrETHAdapterABI,
+        eventName: 'HashStored',
+        fromBlock: toHex(fromBlock),
+        toBlock: toHex(toBlock)
+      })
 
       if (LCUpdateLogs.length) {
         this.logger.info(
@@ -118,9 +108,13 @@ class Relayer {
             )
             if (messageDispatchedLogs.length > this._maxEventToProve && this._maxEventToProve > 0) {
               // only process maxEventToProve amount of event
-              await this.onLogs(messageDispatchedLogs.slice(0, this._maxEventToProve), this.logger)
+              await this.onLogs(
+                messageDispatchedLogs.slice(0, this._maxEventToProve),
+                this.logger,
+                this.sendToMessageDispatchEventQueue
+              )
             } else {
-              await this.onLogs(messageDispatchedLogs, this.logger)
+              await this.onLogs(messageDispatchedLogs, this.logger, this.sendToMessageDispatchEventQueue)
             }
           }
         }
@@ -134,5 +128,3 @@ class Relayer {
     }
   }
 }
-
-export default Relayer
