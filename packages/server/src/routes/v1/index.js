@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { createPublicClient, http, createWalletClient, parseAbiItem, bytesToHex } from 'viem'
+import { createPublicClient, http, parseAbiItem, bytesToHex } from 'viem'
 import * as chains from 'viem/chains'
 import axios from 'axios'
 import { RLP } from '@ethereumjs/rlp'
@@ -86,8 +86,6 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   logger.info('Getting the correct light client slot ...')
   // NOTE: find the first slot > transactionSlot
 
-  // TODO: fetch block root based on lcType
-
   let lightClientFinalizedHeader
 
   if (lcType == 'helios') {
@@ -105,19 +103,19 @@ const getMessageDispatchedProof = async (_request, _reply) => {
     })
   } else if (lcType == 'dendreth') {
     // TODO: Remove comment
-    //   const initialIndex = await targetClient.readContract({
-    //     address: process.env.LIGHT_CLIENT_ADDRESS,
-    //     abi: dendrethAbi,
-    //     functionName: 'currentIndex'
-    //   })
-    //   let currentIndex = initialIndex
-    //   let inverted = false
-    //   const lightClientFinalizedHeader = await targetClient.readContract({
-    //     address: process.env.LIGHT_CLIENT_ADDRESS,
-    //     abi: dendrethAbi,
-    //     functionName: 'finalizedHeaders',
-    //     args: [currentIndex]
-    //   })
+    const initialIndex = await targetClient.readContract({
+      address: process.env.LIGHT_CLIENT_ADDRESS,
+      abi: dendrethLightClientAbi,
+      functionName: 'currentIndex'
+    })
+    let currentIndex = initialIndex
+
+    lightClientFinalizedHeader = await targetClient.readContract({
+      address: process.env.LIGHT_CLIENT_ADDRESS,
+      abi: dendrethLightClientAbi,
+      functionName: 'finalizedHeaders',
+      args: [currentIndex]
+    })
   }
 
   let chainConfig

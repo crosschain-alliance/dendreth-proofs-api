@@ -139,6 +139,10 @@ export default class EventListener {
             } else {
               await this.onLogs(messageDispatchedLogs, this.logger, this.sendToMessageDispatchEventQueue)
             }
+          } else {
+            this.logger.info(
+              `No message dispatched event found  from ${fromBlock} to ${toBlock} on ${this.sourceClient.chain.name}`
+            )
           }
         }
       } else {
