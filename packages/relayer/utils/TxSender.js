@@ -11,12 +11,18 @@ export default class TxSender {
   consumeQueueName
   amqpConnection
   targetClient
+  lightClientType
+  lightClientAdapterABI
+  lightClientAdapterContractAddress
   logger
 
   constructor(_configs) {
     this.consumeQueueName = _configs.consumeQueueName
     this.targetClient = _configs.targetClient
     this.logger = _configs.logger.child({ service: _configs.service })
+    this.lightClientType = _configs.lightClientType
+    this.lightClientAdapterABI = _configs.lightClientAdapterABI
+    this.lightClientAdapterContractAddress = _configs.lightClientAdapterContractAddress
   }
 
   async start() {
@@ -34,16 +40,22 @@ export default class TxSender {
       const txHashResult = JSON.parse(await redisClient.get(txHash))
 
       try {
-        // TODO: replace with actual function parameter
         let { request } = await this.targetClient.simulateContract({
           account: privateKeyToAccount(process.env.PRIVATE_KEY),
-          abi: [
-            parseAbiItem(
-              'function verifyAndStoreDispatchedMessage(uint64 txSlot,bytes32[] memory receiptsRootProof,bytes32 receiptsRoot,bytes[] memory receiptProof,bytes memory txIndexRLPEncoded,uint256 logIndex) external'
-            )
-          ],
+          abi:
+            this.lightClientAdapterABI == 'dendreth'
+              ? [
+                  parseAbiItem(
+                    'function verifyAndStoreDispatchedMessage(bytes32 srcFinalizedHeader, uint64 srcSlot, bytes32[] calldata slotProof,uint64 txSlot,bytes32[] memory receiptsRootProof,bytes32 receiptsRoot,bytes[] memory receiptProof,bytes memory txIndexRLPEncoded,uint256 logIndex) external'
+                  )
+                ]
+              : [
+                  parseAbiItem(
+                    'function verifyAndStoreDispatchedMessage(uint256 headerSlot, bytes32[] calldata slotProof, uint256 txSlot, bytes32[] memory receiptsRootProof, bytes32 receiptsRoot, bytes[] memory receiptProof, bytes memory txIndexRLPEncoded, uint256 logIndex) external'
+                  )
+                ],
           functionName: 'verifyAndStoreDispatchedMessage',
-          address: process.env.DENDRETH_ADAPTER_ADDRESS,
+          address: this.lightClientAdapterContractAddress,
           args: txHashResult.proof
         })
         this.logger.info('Calling verifyAndStoreDispatchMessage with proof...')

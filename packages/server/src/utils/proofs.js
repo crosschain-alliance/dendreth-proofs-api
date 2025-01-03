@@ -155,6 +155,52 @@ export const getReceiptProof = async (_hash, _client) => {
   return { receiptProof: (await trie.createProof(receiptKey)).map(bytesToHex), receiptsRoot: block.receiptsRoot }
 }
 
+// refer from https://github.com/metacraft-labs/DendrETH/blob/main/relay/implementations/beacon-api.ts
+export const fetchBlockHeaderProof = async (slot, _sourceChain, _urls) => {
+  let chainConfig
+  let api
+  let config
+  console.log(_sourceChain.id)
+  ;({ api, config, chainConfig } = getBeaconApi(_sourceChain, chainConfig, _urls))
+
+  const currentBlock = await api.beacon.getBlockV2({
+    blockId: slot
+  })
+
+  const beaconBlockView = config.getForkTypes(slot).BeaconBlock.toView(currentBlock.value().message)
+
+  const beaconBlockTree = new Tree(beaconBlockView.node)
+
+  const beaconBlockHeader = (await api.beacon.getBlockHeader({ blockId: slot })).value()
+  const beaconBlockHeaderView = config.getForkTypes(slot).BeaconBlockHeader.toViewDU(beaconBlockHeader.header.message)
+
+  const beaconBlockHeaderTree = new Tree(beaconBlockHeaderView.node)
+
+  const bodyRootProof = beaconBlockHeaderTree
+    .getSingleProof(config.getForkTypes(slot).BeaconBlockHeader.getPathInfo(['body_root']).gindex)
+    .map(bytesToHex)
+
+  const BLOCK_NUMBER_INDEX = config
+    .getForkTypes(slot)
+    .BeaconBlock.getPathInfo(['body', 'execution_payload', 'block_number']).gindex
+
+  const BLOCK_HASH_INDEX = config
+    .getForkTypes(slot)
+    .BeaconBlock.getPathInfo(['body', 'execution_payload', 'block_hash']).gindex
+
+  const blockNumberProof = beaconBlockTree.getSingleProof(BLOCK_NUMBER_INDEX).map(bytesToHex)
+
+  const blockHashProof = beaconBlockTree.getSingleProof(BLOCK_HASH_INDEX).map(bytesToHex)
+
+  return {
+    slot,
+    blockNumber: currentBlock.value().message.body.executionPayload.blockNumber,
+    blockNumberProof: [...blockNumberProof, ...bodyRootProof],
+    blockHash: bytesToHex(currentBlock.value().message.body.executionPayload.blockHash),
+    blockHashProof: [...blockHashProof, ...bodyRootProof]
+  }
+}
+
 export function getBeaconApi(_sourceChain, chainConfig, _urls) {
   switch (_sourceChain.id) {
     case sepolia.id:

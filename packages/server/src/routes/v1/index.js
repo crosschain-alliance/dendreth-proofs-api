@@ -1,17 +1,19 @@
 import 'dotenv/config'
-import { createPublicClient, http, createWalletClient, parseAbiItem, bytesToHex } from 'viem'
+import { createPublicClient, http, parseAbiItem, bytesToHex } from 'viem'
 import * as chains from 'viem/chains'
 import axios from 'axios'
 import { RLP } from '@ethereumjs/rlp'
 import { Tree } from '@chainsafe/persistent-merkle-tree'
 import logger from '../../utils/logger.js'
-import dendrethAbi from '../../utils/abi/dendreth.js'
+import dendrethLightClientAbi from '../../utils/abi/dendrethABI.js'
+import heliosLightClientAbi from '../../utils/abi/heliosABI.js'
 import { getBeaconApi, getReceiptProof, getReceiptsRootProof } from '../../utils/proofs.js'
+import { fetchBlockHeaderProof } from '../../utils/proofs.js'
 
 const MESSAGE_DISPATCHED_TOPIC = '0x218247aabc759e65b5bb92ccc074f9d62cd187259f2a0984c3c9cf91f67ff7cf'
 
 const getMessageDispatchedProof = async (_request, _reply) => {
-  const { transactionHash } = _request.params
+  const { transactionHash, lcType } = _request.params
 
   const sourceChain = Object.values(chains).find((_chain) => _chain.id === parseInt(process.env.SOURCE_CHAIN_ID))
   const targetChain = Object.values(chains).find((_chain) => _chain.id === parseInt(process.env.TARGET_CHAIN_ID))
@@ -84,87 +86,103 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   logger.info('Getting the correct light client slot ...')
   // NOTE: find the first slot > transactionSlot
 
-  // TODO: Remove comment
-  //   const initialIndex = await targetClient.readContract({
-  //     address: process.env.LC_ADDRESS,
-  //     abi: dendrethAbi,
-  //     functionName: 'currentIndex'
-  //   })
-  //   let currentIndex = initialIndex
-  //   let inverted = false
+  let lightClientFinalizedHeader
 
-  //   const lightClientFinalizedHeader = await targetClient.readContract({
-  //     address: process.env.LC_ADDRESS,
-  //     abi: dendrethAbi,
-  //     functionName: 'finalizedHeaders',
-  //     args: [currentIndex]
-  //   })
+  if (lcType == 'helios') {
+    const headSlot = await targetClient.readContract({
+      address: process.env.LIGHT_CLIENT_ADDRESS,
+      abi: heliosLightClientAbi,
+      functionName: 'head'
+    })
+
+    lightClientFinalizedHeader = await targetClient.readContract({
+      address: process.env.LIGHT_CLIENT_ADDRESS,
+      abi: heliosLightClientAbi,
+      functionName: 'headers',
+      args: [headSlot]
+    })
+  } else if (lcType == 'dendreth') {
+    // TODO: Remove comment
+    const initialIndex = await targetClient.readContract({
+      address: process.env.LIGHT_CLIENT_ADDRESS,
+      abi: dendrethLightClientAbi,
+      functionName: 'currentIndex'
+    })
+    let currentIndex = initialIndex
+
+    lightClientFinalizedHeader = await targetClient.readContract({
+      address: process.env.LIGHT_CLIENT_ADDRESS,
+      abi: dendrethLightClientAbi,
+      functionName: 'finalizedHeaders',
+      args: [currentIndex]
+    })
+  }
 
   let chainConfig
   let api
   let config
   ;({ api, config, chainConfig } = getBeaconApi(sourceChain, chainConfig, [process.env.SOURCE_BEACON_API_URL]))
 
-  //   let finalizedBlockHeader = (await api.beacon.getBlockHeader({ blockId: lightClientFinalizedHeader })).value()
+  let finalizedBlockHeader = (await api.beacon.getBlockHeader({ blockId: lightClientFinalizedHeader })).value()
 
-  //   let lightClientSlot = finalizedBlockHeader.header.message.slot
-  //   const finalizedBlockHeaderView = config
-  //     .getForkTypes(lightClientSlot)
-  //     .BeaconBlockHeader.toViewDU(finalizedBlockHeader.header.message)
+  let lightClientSlot = finalizedBlockHeader.header.message.slot
+  const finalizedBlockHeaderView = config
+    .getForkTypes(lightClientSlot)
+    .BeaconBlockHeader.toViewDU(finalizedBlockHeader.header.message)
 
-  //   let finalizedBlockHeaderTree = new Tree(finalizedBlockHeaderView.node)
+  let finalizedBlockHeaderTree = new Tree(finalizedBlockHeaderView.node)
 
-  //   const lightClientSlotProof = finalizedBlockHeaderTree.getSingleProof(8).map(bytesToHex)
+  const lightClientSlotProof = finalizedBlockHeaderTree.getSingleProof(8).map(bytesToHex)
 
   logger.info('Getting receipts root proof ...')
 
   // TODO: delete
-  const latestSlotIndex = await targetClient.readContract({
-    address: process.env.DENDRETH_ADAPTER_ADDRESS,
-    abi: [
-      {
-        inputs: [],
-        name: 'SLOT_INDEX',
-        outputs: [
-          {
-            internalType: 'uint256',
-            name: '',
-            type: 'uint256'
-          }
-        ],
-        stateMutability: 'view',
-        type: 'function'
-      }
-    ],
-    functionName: 'SLOT_INDEX'
-  })
+  // const latestSlotIndex = await targetClient.readContract({
+  //   address: process.env.LIGHT_CLIENT_ADAPTER_ADDRESS,
+  //   abi: [
+  //     {
+  //       inputs: [],
+  //       name: 'SLOT_INDEX',
+  //       outputs: [
+  //         {
+  //           internalType: 'uint256',
+  //           name: '',
+  //           type: 'uint256'
+  //         }
+  //       ],
+  //       stateMutability: 'view',
+  //       type: 'function'
+  //     }
+  //   ],
+  //   functionName: 'SLOT_INDEX'
+  // })
 
-  const lightClientSlot = await targetClient.readContract({
-    address: process.env.DENDRETH_ADAPTER_ADDRESS,
-    abi: [
-      {
-        inputs: [
-          {
-            internalType: 'uint256',
-            name: 'slotIndex',
-            type: 'uint256'
-          }
-        ],
-        name: 'slotIndexToSlotNumber',
-        outputs: [
-          {
-            internalType: 'uint256',
-            name: 'slotNumber',
-            type: 'uint256'
-          }
-        ],
-        stateMutability: 'view',
-        type: 'function'
-      }
-    ],
-    functionName: 'slotIndexToSlotNumber',
-    args: [latestSlotIndex - 1n]
-  })
+  // const lightClientSlot = await targetClient.readContract({
+  //   address: process.env.LIGHT_CLIENT_ADAPTER_ADDRESS,
+  //   abi: [
+  //     {
+  //       inputs: [
+  //         {
+  //           internalType: 'uint256',
+  //           name: 'slotIndex',
+  //           type: 'uint256'
+  //         }
+  //       ],
+  //       name: 'slotIndexToSlotNumber',
+  //       outputs: [
+  //         {
+  //           internalType: 'uint256',
+  //           name: 'slotNumber',
+  //           type: 'uint256'
+  //         }
+  //       ],
+  //       stateMutability: 'view',
+  //       type: 'function'
+  //     }
+  //   ],
+  //   functionName: 'slotIndexToSlotNumber',
+  //   args: [latestSlotIndex - 1n]
+  // })
 
   const { receiptsRootProof, receiptsRoot: receiptsRootFromSlot } = await getReceiptsRootProof(
     Number(lightClientSlot),
@@ -188,25 +206,59 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   // lightClientFinalizedHeader: the block root of the beacon block, stored on light client contract, it is not the execution block hash
   // lightClientSlot: the corresponding slot
   // execution block's block hash is stored in adapter contract
-  const proof = [
-    // lightClientFinalizedHeader,
-    // parseInt(lightClientSlot),
-    // lightClientSlotProof,
-    parseInt(transactionSlot),
-    receiptsRootProof,
-    receiptsRoot,
-    receiptProof,
-    '0x' + Buffer.from(RLP.encode(receipt.transactionIndex)).toString('hex'),
-    logIndex
-  ]
+
+  const proof =
+    lcType == 'dendreth'
+      ? [
+          lightClientFinalizedHeader,
+          parseInt(lightClientSlot),
+          lightClientSlotProof,
+          parseInt(transactionSlot),
+          receiptsRootProof,
+          receiptsRoot,
+          receiptProof,
+          '0x' + Buffer.from(RLP.encode(receipt.transactionIndex)).toString('hex'),
+          logIndex
+        ]
+      : [
+          parseInt(lightClientSlot),
+          lightClientSlotProof,
+          parseInt(transactionSlot),
+          receiptsRootProof,
+          receiptsRoot,
+          receiptProof,
+          '0x' + Buffer.from(RLP.encode(receipt.transactionIndex)).toString('hex'),
+          logIndex
+        ]
 
   _reply.send({
     proof
   })
 }
 
+const getBlockHeaderProof = async (_request, _reply) => {
+  const { slot } = _request.params
+
+  logger.info(`Getting block header proof for slot ${slot}`)
+  const sourceChain = Object.values(chains).find((_chain) => _chain.id === parseInt(process.env.SOURCE_CHAIN_ID))
+
+  const blockHeaderProof = await fetchBlockHeaderProof(slot, sourceChain, [process.env.SOURCE_BEACON_API_URL])
+
+  const proof = [
+    blockHeaderProof.slot,
+    blockHeaderProof.blockNumber,
+    blockHeaderProof.blockNumberProof,
+    blockHeaderProof.blockHash,
+    blockHeaderProof.blockHashProof
+  ]
+
+  _reply.send({
+    proof
+  })
+}
 const handler = (_fastify, _opts, _done) => {
-  _fastify.get('/get-message-dispatched-proof/:transactionHash', getMessageDispatchedProof)
+  _fastify.get(`/get-block-header-proof/:slot`, getBlockHeaderProof)
+  _fastify.get('/get-message-dispatched-proof/:lcType/:transactionHash', getMessageDispatchedProof)
   _done()
 }
 

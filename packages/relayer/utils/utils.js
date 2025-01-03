@@ -43,4 +43,8 @@ const waitForServer = async (url, retries = 5, interval = 10000) => {
   throw new Error('Server did not become ready in time')
 }
 
-export { jsonStringify, getLatestLCUpdateLog, waitForServer }
+const isValidLightClientType = (lightClientType) => {
+  return lightClientType == 'helios' || lightClientType == 'dendreth'
+}
+
+export { jsonStringify, getLatestLCUpdateLog, waitForServer, isValidLightClientType }
