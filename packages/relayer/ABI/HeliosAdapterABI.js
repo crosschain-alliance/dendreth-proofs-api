@@ -25,7 +25,6 @@ export default [
   { inputs: [], name: 'InvalidEventSignature', type: 'error' },
   { inputs: [], name: 'InvalidEventSource', type: 'error' },
   { inputs: [], name: 'InvalidReceiptsRoot', type: 'error' },
-  { inputs: [], name: 'InvalidSlot', type: 'error' },
   { inputs: [], name: 'UnsupportedTxType', type: 'error' },
   {
     anonymous: false,
@@ -99,10 +98,8 @@ export default [
   },
   {
     inputs: [
-      { internalType: 'uint256', name: 'headerSlot', type: 'uint256' },
-      { internalType: 'uint256', name: 'slot', type: 'uint256' },
-      { internalType: 'bytes32[]', name: 'slotProof', type: 'bytes32[]' },
-      { internalType: 'uint256', name: 'txSlot', type: 'uint256' },
+      { internalType: 'uint64', name: 'headerSlot', type: 'uint64' },
+      { internalType: 'uint64', name: 'txSlot', type: 'uint64' },
       { internalType: 'bytes32[]', name: 'receiptsRootProof', type: 'bytes32[]' },
       { internalType: 'bytes32', name: 'receiptsRoot', type: 'bytes32' },
       { internalType: 'bytes[]', name: 'receiptProof', type: 'bytes[]' },
