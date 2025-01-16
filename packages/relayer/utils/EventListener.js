@@ -90,7 +90,6 @@ export default class EventListener {
         let latestLCLog = getLatestLCUpdateLog(LCUpdateLogs)
 
         if (latestLCLog) {
-          // TODO:
           // for DendrETH, latestLCLog.topics[1] is the block number
           // for Helios, latestLCLog.topics[1] is the slot number, need to find the corresponding block number
 
@@ -144,6 +143,8 @@ export default class EventListener {
               `No message dispatched event found  from ${fromBlock} to ${toBlock} on ${this.sourceClient.chain.name}`
             )
           }
+        } else {
+          this.logger.info(`Latest Hash Stored event is not a store block header event`)
         }
       } else {
         this.logger.info('No light client update found...')

@@ -222,7 +222,6 @@ const getMessageDispatchedProof = async (_request, _reply) => {
         ]
       : [
           parseInt(lightClientSlot),
-          lightClientSlotProof,
           parseInt(transactionSlot),
           receiptsRootProof,
           receiptsRoot,

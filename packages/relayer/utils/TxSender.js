@@ -43,7 +43,7 @@ export default class TxSender {
         let { request } = await this.targetClient.simulateContract({
           account: privateKeyToAccount(process.env.PRIVATE_KEY),
           abi:
-            this.lightClientAdapterABI == 'dendreth'
+            this.lightClientType == 'dendreth'
               ? [
                   parseAbiItem(
                     'function verifyAndStoreDispatchedMessage(bytes32 srcFinalizedHeader, uint64 srcSlot, bytes32[] calldata slotProof,uint64 txSlot,bytes32[] memory receiptsRootProof,bytes32 receiptsRoot,bytes[] memory receiptProof,bytes memory txIndexRLPEncoded,uint256 logIndex) external'
