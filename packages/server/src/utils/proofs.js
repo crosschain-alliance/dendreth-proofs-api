@@ -225,9 +225,9 @@ export function getBeaconApi(_sourceChain, chainConfig, _urls) {
   const api = getClient(
     {
       urls: _urls,
-      retries: 3, // Number of retries
-      retryDelay: 1000, // Delay between retries (1 second)
-      timeoutMs: 500_000
+      // retries: 3, // Number of retries
+      // retryDelay: 1000, // Delay between retries (1 second)
+      timeoutMs: 10 * 60 * 1000
     },
     {
       config

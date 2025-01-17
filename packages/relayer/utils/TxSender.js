@@ -51,7 +51,7 @@ export default class TxSender {
                 ]
               : [
                   parseAbiItem(
-                    'function verifyAndStoreDispatchedMessage(uint256 headerSlot, uint256 txSlot, bytes32[] memory receiptsRootProof, bytes32 receiptsRoot, bytes[] memory receiptProof, bytes memory txIndexRLPEncoded, uint256 logIndex) external'
+                    'function verifyAndStoreDispatchedMessage(uint64 headerSlot, uint64 txSlot, bytes32[] memory receiptsRootProof, bytes32 receiptsRoot, bytes[] memory receiptProof, bytes memory txIndexRLPEncoded, uint256 logIndex) external'
                   )
                 ],
           functionName: 'verifyAndStoreDispatchedMessage',

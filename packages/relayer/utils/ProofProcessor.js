@@ -37,11 +37,18 @@ export default class ProofProcessor {
 
         this.logger.info(`Fetching proof for tx hash  ${txHash}`)
         try {
-          axiosRetry(axios, { retries: 2 })
+          // axiosRetry(axios, { retries: 2 })
+          // let { data: proof } = await axios.get(
+          //   `${process.env.PROOF_API}/v1/get-message-dispatched-proof/${process.env.LC_TYPE}/${txHash}`,
+          //   {
+          //     timeout: process.env.SERVER_REQUEST_TIMEOUT
+          //   }
+          // )
+
           let { data: proof } = await axios.get(
             `${process.env.PROOF_API}/v1/get-message-dispatched-proof/${process.env.LC_TYPE}/${txHash}`,
             {
-              timeout: process.env.SERVER_REQUEST_TIMEOUT
+              timeout: parseInt(process.env.SERVER_REQUEST_TIMEOUT, 10) || 10 * 60 * 1000
             }
           )
 
