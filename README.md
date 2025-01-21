@@ -1,6 +1,8 @@
-# DendrETH proof API
+# Light Client based Prover for Hashi Adapter
 
-This repository provides event proof api from DendrETH light client, and relayer logic to listen event from Yaho, and verify proof on DendrETH Adapter.
+This repository provides event proof and block header proof api for light client based Hashi Adapter.
+
+![System Architecture](./static/Architecture.png)
 
 1. `packages/server`: Prover API logic
 2. `packages/relayer`: Listen to event and generate proof for verification on adapter contract. There are two kinds of light clients supported: [SP1 Helios](https://github.com/succinctlabs/sp1-helios) and [DendrETH](https://github.com/metacraft-labs/DendrETH), and two kinds of proof supported: Event proof for `MessageDispatched` event from Yaho and Block Header proof.
@@ -27,6 +29,7 @@ git clone https://github.com/crosschain-alliance/dendreth-proofs-api
 Install
 
 ```bash
+nvm use
 yarn install
 ```
 
@@ -42,6 +45,7 @@ yarn start
 
 1. DendrETH Adapter & SP1 Helios Adapter: https://crosschain-alliance.gitbook.io/hashi/deployments/oracles#zk-light-clients
 2. Contract code: https://github.com/gnosis/hashi
+3. Modified version of SP1 Helios to support Gnosis Chain & LUKSO: https://github.com/crosschain-alliance/sp1-helios
 
 ## Run docker
 
