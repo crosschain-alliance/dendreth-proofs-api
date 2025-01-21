@@ -3,7 +3,9 @@
 This repository provides event proof api from DendrETH light client, and relayer logic to listen event from Yaho, and verify proof on DendrETH Adapter.
 
 1. `packages/server`: Prover API logic
-2. `packages/relayer`: Listen to `HashStored` event from DendrETH Adapter, `MessageDispatched` event from Yaho, and call `verifyAndStoreDispatchedMessage` on DendrETH Adapter contract.
+2. `packages/relayer`: Listen to event and generate proof for verification on adapter contract. There are two kinds of light clients supported: [SP1 Helios](https://github.com/succinctlabs/sp1-helios) and [DendrETH](https://github.com/metacraft-labs/DendrETH), and two kinds of proof supported: Event proof for `MessageDispatched` event from Yaho and Block Header proof.
+   1. Block header proof: Based on given slot and it's corresponding beacon block header ([Beacon block state root](https://eth2book.info/capella/part3/containers/blocks/#beaconblock)) from light client contract, prove the Execution block header (block hash) of the corresponding execution block number.
+   1. `MessageDispatched` event proof: Generate event proof emitted from Yaaho contract based on the beacon block header from light client.
 
 ## Dev
 
@@ -36,7 +38,10 @@ cp .env.example .env # configure the .env file
 yarn start
 ```
 
-The DendrETH Adapter contract addresses can be found [here](https://crosschain-alliance.gitbook.io/hashi/deployments/oracles#dendreth)
+## Deployments
+
+1. DendrETH Adapter & SP1 Helios Adapter: https://crosschain-alliance.gitbook.io/hashi/deployments/oracles#zk-light-clients
+2. Contract code: https://github.com/gnosis/hashi
 
 ## Run docker
 
