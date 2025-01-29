@@ -3,6 +3,7 @@ const jsonStringify = (obj) => {
 }
 
 const getLatestLCUpdateLog = (LCUpdateLogs) => {
+  // TODO: make sure that the id is a block number / beacon slot
   if (!LCUpdateLogs || LCUpdateLogs.length === 0) {
     return null // Return null if the array is empty or undefined
   }
@@ -47,4 +48,14 @@ const isValidLightClientType = (lightClientType) => {
   return lightClientType == 'helios' || lightClientType == 'dendreth'
 }
 
-export { jsonStringify, getLatestLCUpdateLog, waitForServer, isValidLightClientType }
+const filterDestionChainForMessageDispatchedLogs = (logs, chainID) => {
+  return logs.filter((log) => Number(BigInt('0x' + log.data.slice(130, 194))) === chainID)
+}
+
+export {
+  jsonStringify,
+  getLatestLCUpdateLog,
+  waitForServer,
+  isValidLightClientType,
+  filterDestionChainForMessageDispatchedLogs
+}

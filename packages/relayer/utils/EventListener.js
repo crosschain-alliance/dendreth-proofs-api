@@ -1,6 +1,6 @@
 import { toHex, hexToNumber } from 'viem'
 import axios from 'axios'
-import { getLatestLCUpdateLog, waitForServer } from './utils.js'
+import { getLatestLCUpdateLog, waitForServer, filterDestionChainForMessageDispatchedLogs } from './utils.js'
 
 // 1. Watch for Hash Stored event on DendrETH Adapter with store block header function call
 //  (no direct way to check the call, but we can check the HashStored event's id if it is a block number)
@@ -111,7 +111,7 @@ export default class EventListener {
             toBlock = BigInt(latestLCLog.topics[1])
           }
           // find the MessageDispatched event from the source chain
-          const messageDispatchedLogs = await this.sourceClient.getContractEvents({
+          let messageDispatchedLogs = await this.sourceClient.getContractEvents({
             address: this.yahoContractAddress,
             abi: this.YahoABI,
             eventName: 'MessageDispatched',
@@ -121,6 +121,12 @@ export default class EventListener {
 
           this.logger.info(
             `Searching for Message Dispatch event from ${fromBlock} to ${toBlock} on ${this.sourceClient.chain.name}`
+          )
+
+          // filter message dispatch logs with destination chain ID
+          messageDispatchedLogs = filterDestionChainForMessageDispatchedLogs(
+            messageDispatchedLogs,
+            await this.targetClient.getChainId()
           )
 
           // Proceed with event proof
