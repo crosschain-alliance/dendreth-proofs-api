@@ -115,8 +115,8 @@ export default class EventListener {
             address: this.yahoContractAddress,
             abi: this.YahoABI,
             eventName: 'MessageDispatched',
-            fromBlock,
-            toBlock
+            fromBlock: toHex(fromBlock),
+            toBlock: toHex(toBlock)
           })
 
           this.logger.info(
