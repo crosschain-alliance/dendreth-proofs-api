@@ -38,3 +38,27 @@ To start the application in production mode, use:
 cd packages/relayer
 yarn start
 ```
+
+# Configuration
+
+```
+1. SOURCE_YAHO_ADDRESS: yaho address on source chain
+2. LIGHT_CLIENT_ADDRESS: light client address on target chain that emits `HashStored`
+3. LIGHT_CLIENT_ADAPTER_ADDRESS: light client adapter address on target chain that verify the proof and store hash
+4. PROOF_API= <http://server_name:port>
+5. PRIVATE_KEY= private key from the address that calls target chain's verification function
+6. SOURCE_CHAIN_ID: source chain Id
+7. TARGET_CHAIN_ID: destination chain Id
+8. WATCH_INTERVAL_TIME_MS: interval for event listener to watch `HashStored` event, in ms
+9. SOURCE_RPC: rpc for source chain
+10. TARGET_RPC: rpc for target chain
+11. MAX_BLOCK_WINDOW: max number of block to watch prior to the block number that light client has updated w.r.t source chain
+12. MAX_EVENT_TO_PROVE: max event to prove in a single proof cycle(every block header stored event), set -1 if prove all
+13. INITIAL_QUERY_FROM_BLOCK: initial 'from' block to query light client's `HashStored` block header update on Adapter
+14. SERVER_REQUEST_TIMEOUT: timeout for the relayer to call server, in ms
+15. RABBITMQ_URL: amqp://rabbitmq:5672
+16. REDIS_URL=redis://redis:6379
+17. LC_TYPE: light client type("helios" or "dendreth")
+18. BEACONCHA_IN_URL: https://gnosischa.in or https://beaconcha.in
+19. LOG_LEVEL: default to info
+```
