@@ -4,6 +4,9 @@ import { parseAbiItem } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import redisClient from './redisClient.js'
 
+// 1. consume tx_to_send_queue
+// 2. send proof to contract
+// TODO: batching txs
 export default class TxSender {
   consumeQueueName
   amqpConnection
@@ -49,7 +52,7 @@ export default class TxSender {
 
           try {
             // Retrieve proof from Redis
-            this.logger.info(`Fetching proof from Redis for tx hash ${txHash}`)
+            this.logger.debug(`Fetching proof from Redis for tx hash ${txHash}`)
             const redisData = await redisClient.get(txHash)
 
             if (!redisData) {
@@ -77,7 +80,7 @@ export default class TxSender {
               return
             }
 
-            this.logger.info(`Successfully retrieved proof from Redis for tx hash ${txHash}`)
+            this.logger.debug(`Successfully retrieved proof from Redis for tx hash ${txHash}`)
             const txHashResult = JSON.parse(redisData)
 
             // Select the appropriate ABI based on light client type
@@ -95,7 +98,7 @@ export default class TxSender {
                   ]
 
             // Simulate the contract call first
-            this.logger.info(`Simulating contract call for tx hash ${txHash}`)
+            this.logger.debug(`Simulating contract call for tx hash ${txHash}`)
             let { request } = await this.targetClient.simulateContract({
               account: privateKeyToAccount(process.env.PRIVATE_KEY),
               abi: abi,
@@ -105,7 +108,7 @@ export default class TxSender {
             })
 
             // Execute the contract call
-            this.logger.info(`Executing verifyAndStoreDispatchMessage with proof for tx hash ${txHash}...`)
+            this.logger.debug(`Executing verifyAndStoreDispatchMessage with proof for tx hash ${txHash}...`)
             let tx = await this.targetClient.writeContract(request)
 
             this.logger.info(
@@ -155,8 +158,6 @@ export default class TxSender {
         },
         { noAck: false }
       )
-
-      this.logger.info('TxSender started and listening for messages')
     } catch (error) {
       this.logger.error(`Fatal error starting TxSender: ${error}`)
       throw error

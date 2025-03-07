@@ -160,7 +160,6 @@ export const fetchBlockHeaderProof = async (slot, _sourceChain, _urls) => {
   let chainConfig
   let api
   let config
-  console.log(_sourceChain.id)
   ;({ api, config, chainConfig } = getBeaconApi(_sourceChain, chainConfig, _urls))
 
   const currentBlock = await api.beacon.getBlockV2({

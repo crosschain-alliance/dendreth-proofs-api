@@ -49,7 +49,7 @@ export default class ProofProcessor {
 
           try {
             // Get proof from API
-            this.logger.info(`Fetching proof for tx hash ${txHash} from API`)
+            this.logger.debug(`Fetching proof for tx hash ${txHash} from API`)
             let { data: proof } = await axios.get(
               `${process.env.PROOF_API}/v1/get-message-dispatched-proof/${process.env.LC_TYPE}/${txHash}`,
               {
@@ -60,21 +60,21 @@ export default class ProofProcessor {
             let proofResult = proof.proof
 
             // Log the proof result
-            this.logger.info(`Received proof for ${txHash}`)
+            this.logger.debug(`Received proof for ${txHash}`)
 
             // Save to Redis
-            this.logger.info(`Saving proof to Redis for tx hash ${txHash}`)
+            this.logger.debug(`Saving proof to Redis for tx hash ${txHash}`)
             const result = {
               proof: proofResult,
               timestamp: Date.now()
             }
 
             await redisClient.set(txHash, JSON.stringify(result))
-            this.logger.info(`Successfully saved proof to Redis for tx hash ${txHash}`)
+            this.logger.debug(`Successfully saved proof to Redis for tx hash ${txHash}`)
 
             // Send to TxSender queue
             // 1. Using the provided callback function
-            this.logger.info(`Sending ${txHash} to TxSender queue via callback`)
+            this.logger.debug(`Sending ${txHash} to TxSender queue via callback`)
             this.sendToTxSenderQueue(Buffer.from(txHash))
 
             // // 2. Also possible to send directly via the channel as a backup
@@ -84,7 +84,7 @@ export default class ProofProcessor {
             //   messageId: `${txHash}-${Date.now()}`
             // })
 
-            this.logger.info(`Successfully sent ${txHash} to TxSender queue`)
+            this.logger.debug(`Successfully sent ${txHash} to TxSender queue`)
 
             // Acknowledge the message
             this.channel.ack(msg)
@@ -114,8 +114,6 @@ export default class ProofProcessor {
         },
         { noAck: false }
       )
-
-      this.logger.info('ProofProcessor started and listening for messages')
     } catch (error) {
       this.logger.error(`Fatal error starting ProofProcessor: ${error}`)
       throw error

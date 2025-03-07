@@ -108,13 +108,10 @@ export default class EventListener {
           let toBlock
 
           if (this.lightClientType == 'helios') {
-            this.logger.info(`Slot ${hexToNumber(latestLCLog.topics[1])}}`)
-
             const {
               data: { data }
             } = await axios.get(`${process.env.BEACONCHA_IN_URL}/api/v1/slot/${hexToNumber(latestLCLog.topics[1])}`)
 
-            this.logger.info(`Data from block ${data}`)
             fromBlock = data.exec_block_number - this._maxBlockWindow
             toBlock = data.exec_block_number
           } else if (this.lightClientType == 'dendreth') {
@@ -161,7 +158,7 @@ export default class EventListener {
             )
           }
         } else {
-          this.logger.info(`Latest Hash Stored event is not a store block header event`)
+          this.logger.debug(`Latest Hash Stored event is not a store block header event`)
         }
       } else {
         this.logger.info('No light client update found...')

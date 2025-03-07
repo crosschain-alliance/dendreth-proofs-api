@@ -61,7 +61,7 @@ const getMessageDispatchedProof = async (_request, _reply) => {
     } while (diff != 0n)
 
     if (diff == 0) {
-      console.log(`Found slot ${slot} corresponding to ${blockNumber} block Number on ${sourceClient.chain.name}`)
+      logger.info(`Found slot ${slot} corresponding to ${blockNumber} block Number on ${sourceClient.chain.name}`)
     }
     transactionSlot = slot
   } else {
