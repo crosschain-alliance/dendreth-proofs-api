@@ -61,7 +61,7 @@ const getMessageDispatchedProof = async (_request, _reply) => {
     } while (diff != 0n)
 
     if (diff == 0) {
-      console.log(`Found slot ${slot} corresponding to ${blockNumber} block Number on ${sourceClient.chain.name}`)
+      logger.info(`Found slot ${slot} corresponding to ${blockNumber} block Number on ${sourceClient.chain.name}`)
     }
     transactionSlot = slot
   } else {
@@ -74,9 +74,9 @@ const getMessageDispatchedProof = async (_request, _reply) => {
       }
     ] = data
 
-    if (!finalized) {
-      return _reply.code(400).send({ error: 'Block not finalized' })
-    }
+    // if (!finalized) {
+    //   return _reply.code(400).send({ error: 'Block not finalized' })
+    // }
     transactionSlot = slot
   }
 
@@ -102,7 +102,6 @@ const getMessageDispatchedProof = async (_request, _reply) => {
       args: [headSlot]
     })
   } else if (lcType == 'dendreth') {
-    // TODO: Remove comment
     const initialIndex = await targetClient.readContract({
       address: process.env.LIGHT_CLIENT_ADDRESS,
       abi: dendrethLightClientAbi,
@@ -135,54 +134,6 @@ const getMessageDispatchedProof = async (_request, _reply) => {
   const lightClientSlotProof = finalizedBlockHeaderTree.getSingleProof(8).map(bytesToHex)
 
   logger.info('Getting receipts root proof ...')
-
-  // TODO: delete
-  // const latestSlotIndex = await targetClient.readContract({
-  //   address: process.env.LIGHT_CLIENT_ADAPTER_ADDRESS,
-  //   abi: [
-  //     {
-  //       inputs: [],
-  //       name: 'SLOT_INDEX',
-  //       outputs: [
-  //         {
-  //           internalType: 'uint256',
-  //           name: '',
-  //           type: 'uint256'
-  //         }
-  //       ],
-  //       stateMutability: 'view',
-  //       type: 'function'
-  //     }
-  //   ],
-  //   functionName: 'SLOT_INDEX'
-  // })
-
-  // const lightClientSlot = await targetClient.readContract({
-  //   address: process.env.LIGHT_CLIENT_ADAPTER_ADDRESS,
-  //   abi: [
-  //     {
-  //       inputs: [
-  //         {
-  //           internalType: 'uint256',
-  //           name: 'slotIndex',
-  //           type: 'uint256'
-  //         }
-  //       ],
-  //       name: 'slotIndexToSlotNumber',
-  //       outputs: [
-  //         {
-  //           internalType: 'uint256',
-  //           name: 'slotNumber',
-  //           type: 'uint256'
-  //         }
-  //       ],
-  //       stateMutability: 'view',
-  //       type: 'function'
-  //     }
-  //   ],
-  //   functionName: 'slotIndexToSlotNumber',
-  //   args: [latestSlotIndex - 1n]
-  // })
 
   const { receiptsRootProof, receiptsRoot: receiptsRootFromSlot } = await getReceiptsRootProof(
     Number(lightClientSlot),

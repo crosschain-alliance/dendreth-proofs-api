@@ -1,5 +1,6 @@
 import redis from 'redis'
 import 'dotenv/config'
+import logger from './Logger'
 
 // Create a Redis client
 const redisClient = redis.createClient({
@@ -8,12 +9,12 @@ const redisClient = redis.createClient({
 
 // Event listener for successful connection
 redisClient.on('connect', () => {
-  console.log('Successfully connected to Redis on port 6379!')
+  logger.info('Successfully connected to Redis on port 6379!')
 })
 
 // Event listener for errors
 redisClient.on('error', (err) => {
-  console.error('Redis connection error:', err)
+  logger.error('Redis connection error:', err)
 })
 
 export default redisClient

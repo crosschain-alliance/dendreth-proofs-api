@@ -2,7 +2,7 @@ import { toHex, hexToNumber } from 'viem'
 import axios from 'axios'
 import { getLatestLCUpdateLog, waitForServer, filterDestionChainForMessageDispatchedLogs } from './utils.js'
 
-// 1. Watch for Hash Stored event on DendrETH Adapter with store block header function call
+// 1. Watch for Hash Stored event on Adapter with store block header function call
 //  (no direct way to check the call, but we can check the HashStored event's id if it is a block number)
 // 2. Once get the block number in HashStored, we query the Yaho event from blockNum - maxBlockWindow  to blockNum
 // 3. Get the events and push to message_dispatch_event_queue
@@ -21,6 +21,7 @@ export default class EventListener {
   _watchIntervalTimeMs
   _maxBlockWindow
   _maxEventToProve
+  _isWatching = false
 
   constructor(_configs) {
     this.logger = _configs.logger.child({ service: _configs.service })
@@ -43,23 +44,33 @@ export default class EventListener {
   async start() {
     await waitForServer(this.proverURL)
     try {
-      this._watch()
-      setInterval(() => {
-        this._watch()
-      }, this._watchIntervalTimeMs)
+      this._watchLoop()
     } catch (_err) {
       this.logger.error(_err)
     }
   }
 
+  async _watchLoop() {
+    try {
+      await this._watch()
+    } catch (err) {
+      this.logger.error(`Error in _watch: ${err}`)
+    } finally {
+      // Schedule the next execution after the interval
+      setTimeout(() => this._watchLoop(), this._watchIntervalTimeMs)
+    }
+  }
   async _watch() {
+    // Set flag to indicate we're currently watching
+    this._isWatching = true
+
     try {
       const currentBlock = await this.targetClient.getBlockNumber()
 
       if (!this._lastBlock) {
-        this._lastBlock = currentBlock - BigInt(this._maxBlockWindow)
+        this._lastBlock = currentBlock - 2n
       }
-      let fromBlock = this._lastBlock
+      let fromBlock = this._lastBlock + 1n
       let toBlock = currentBlock - 1n
       let isBlockRangeMismatch = fromBlock < toBlock ? false : true
       if (isBlockRangeMismatch) {
@@ -97,13 +108,10 @@ export default class EventListener {
           let toBlock
 
           if (this.lightClientType == 'helios') {
-            this.logger.info(`Slot ${hexToNumber(latestLCLog.topics[1])}}`)
-
             const {
               data: { data }
             } = await axios.get(`${process.env.BEACONCHA_IN_URL}/api/v1/slot/${hexToNumber(latestLCLog.topics[1])}`)
 
-            this.logger.info(`Data from block ${data}`)
             fromBlock = data.exec_block_number - this._maxBlockWindow
             toBlock = data.exec_block_number
           } else if (this.lightClientType == 'dendreth') {
@@ -150,7 +158,7 @@ export default class EventListener {
             )
           }
         } else {
-          this.logger.info(`Latest Hash Stored event is not a store block header event`)
+          this.logger.debug(`Latest Hash Stored event is not a store block header event`)
         }
       } else {
         this.logger.info('No light client update found...')
@@ -159,6 +167,9 @@ export default class EventListener {
       this._lastBlock = toBlock
     } catch (_err) {
       this.logger.error(`${_err}`)
+    } finally {
+      // Reset flag when we're done, regardless of success or failure
+      this._isWatching = false
     }
   }
 }
