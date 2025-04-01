@@ -1,6 +1,6 @@
 import redis from 'redis'
 import 'dotenv/config'
-import logger from './Logger'
+import logger from './Logger.js'
 
 // Create a Redis client
 const redisClient = redis.createClient({

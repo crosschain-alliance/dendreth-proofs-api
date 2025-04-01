@@ -1,6 +1,6 @@
 import amqp from 'amqplib'
 import 'dotenv/config'
-import { parseAbiItem } from 'viem'
+import { parseAbiItem, decodeEventLog } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import redisClient from './redisClient.js'
 
@@ -14,16 +14,25 @@ export default class TxSender {
   lightClientType
   lightClientAdapterABI
   lightClientAdapterContractAddress
+  yahoABI
+  yaruABI
+  yaruAddress
+  isCallYaruExecuteMessages
   logger
   channel
 
   constructor(_configs) {
     this.consumeQueueName = _configs.consumeQueueName
+    this.sourceClient = _configs.sourceClient
     this.targetClient = _configs.targetClient
     this.logger = _configs.logger.child({ service: _configs.service })
     this.lightClientType = _configs.lightClientType
     this.lightClientAdapterABI = _configs.lightClientAdapterABI
     this.lightClientAdapterContractAddress = _configs.lightClientAdapterContractAddress
+    this.yahoABI = _configs.yahoABI
+    this.yaruAddress = _configs.yaruAddress
+    this.yaruABI = _configs.yaruABI
+    this.isCallYaruExecuteMessages = _configs.isCallYaruExecuteMessages
   }
 
   async start() {
@@ -115,6 +124,53 @@ export default class TxSender {
               `Success! Event proof for tx ${txHash} verified on ${this.targetClient.chain.name}: tx hash ${tx}`
             )
 
+            if (this.isCallYaruExecuteMessages) {
+              this.logger.debug('Waiting for one block to be mined...')
+              await this.targetClient.waitForTransactionReceipt({ hash: tx })
+              const messageDispatchedReceipt = await this.sourceClient.getTransactionReceipt({
+                hash: txHash
+              })
+
+              let messageDispatchedLog = messageDispatchedReceipt.logs.filter(
+                (log) => log.topics[0] == '0x218247aabc759e65b5bb92ccc074f9d62cd187259f2a0984c3c9cf91f67ff7cf'
+              )
+
+              if (messageDispatchedLog.length) {
+                const decodedLog = decodeEventLog({
+                  abi: this.yahoABI,
+                  data: messageDispatchedLog[0].data,
+                  topics: messageDispatchedLog[0].topics
+                })
+
+                let { request: executeMessageRequest } = await this.targetClient.simulateContract({
+                  account: privateKeyToAccount(process.env.PRIVATE_KEY),
+                  abi: this.yaruABI,
+                  functionName: 'executeMessages',
+                  address: this.yaruAddress,
+                  args: [
+                    [
+                      {
+                        nonce: decodedLog.args.message.nonce.toString(),
+                        targetChainId: parseInt(decodedLog.args.message.targetChainId.toString()),
+                        threshold: parseInt(decodedLog.args.message.threshold.toString()),
+                        sender: decodedLog.args.message.sender,
+                        receiver: decodedLog.args.message.receiver,
+                        data: decodedLog.args.message.data,
+                        reporters: decodedLog.args.message.reporters,
+                        adapters: decodedLog.args.message.adapters
+                      }
+                    ]
+                  ]
+                })
+
+                this.logger.debug(`Executing executeMessage for tx hash ${txHash} on Yaru contract...`)
+                let tx = await this.targetClient.writeContract(executeMessageRequest)
+                this.logger.info(
+                  `Success! Message for ${this.sourceClient.chain.name} tx ${txHash} executed on ${this.targetClient.chain.name}: tx hash ${tx}`
+                )
+              }
+            }
+
             // Acknowledge the message after successful processing
             this.channel.ack(msg)
             this.logger.info(`Acknowledged message ${txHash} from queue ${this.consumeQueueName}`)
@@ -132,7 +188,7 @@ export default class TxSender {
 
             if (isRetriable) {
               const retryCount = (msg.properties.headers?.retryCount || 0) + 1
-              if (retryCount <= 5) {
+              if (retryCount <= 2) {
                 // Requeue with exponential backoff
                 const delay = Math.pow(2, retryCount) * 1000
                 this.logger.info(

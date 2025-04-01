@@ -8,6 +8,7 @@ import EventListener from './utils/EventListener.js'
 import ProofProcessor from './utils/ProofProcessor.js'
 import TxSender from './utils/TxSender.js'
 import YahoABI from './ABI/YahoABI.js'
+import YaruABI from './ABI/YaruABI.js'
 import DendrETHAdapterABI from './ABI/DendrETHAdapterABI.js'
 import HeliosAdapterABI from './ABI/HeliosAdapterABI.js'
 import HeliosLightClientABI from './ABI/HeliosLightClientABI.js'
@@ -130,10 +131,15 @@ async function main() {
 
     const txSender = new TxSender({
       consumeQueueName: `tx_to_send_queue_${sourceClient.chain.id}_${targetClient.chain.id}`,
-      targetClient: targetClient,
+      sourceClient,
+      targetClient,
+      isCallYaruExecuteMessages: process.env.IS_CALL_YARU_EXECUTE_MESSAGES,
       lightClientType: process.env.LC_TYPE,
       lightClientAdapterABI: process.env.LC_TYPE == 'dendreth' ? DendrETHAdapterABI : HeliosAdapterABI,
       lightClientAdapterContractAddress: process.env.LIGHT_CLIENT_ADAPTER_ADDRESS,
+      yaruABI: YaruABI,
+      yaruAddress: process.env.YARU_ADDRESS,
+      yahoABI: YahoABI,
       service: 'TxSender',
       logger
     })

@@ -36,7 +36,9 @@ export default class EventListener {
     this.proverURL = _configs.proverURL
     this.sendToMessageDispatchEventQueue = _configs.sendToMessageDispatchEventQueue
     this._watchIntervalTimeMs = _configs.watchIntervalTimeMs
-    this._lastBlock = _configs.queryFromBlock ? _configs.queryFromBlock : this.targetClient.getBlockNumber() - 10
+    this._lastBlock = _configs.queryFromBlock
+      ? BigInt(_configs.queryFromBlock)
+      : this.targetClient.getBlockNumber() - 10n
     this._maxBlockWindow = _configs.maxBlockWindow
     this._maxEventToProve = _configs.maxEventToProve
   }
