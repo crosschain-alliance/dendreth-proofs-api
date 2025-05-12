@@ -15,9 +15,9 @@
     "@ethereumjs/rlp": "^5.0.2",
     "@ethereumjs/trie": "^6.2.1",
     "@ethereumjs/tx": "^5.4.0",
-    "@lodestar/api": "^1.21.0",
-    "@lodestar/config": "^1.21.0",
-    "@lodestar/types": "^1.21.0",
+    "@lodestar/api": "^1.29.0",
+    "@lodestar/config": "^1.29.0",
+    "@lodestar/types": "^1.29.0",
     "dotenv": "^16.4.7",
     "fastify": "^4.26.2",
     "node-fetch": "^3.3.2"
