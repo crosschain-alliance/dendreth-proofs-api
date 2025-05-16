@@ -22,77 +22,64 @@ export const getReceiptsRootProof = async (_srcSlot, _targetSlot, _urls, _source
   let receiptsRoot
 
   const statePath = ['state_root']
-
   const rootPath = ['block_roots', _targetSlot % SLOTS_PER_HISTORICAL_ROOT]
   const receiptPath = ['body', 'execution_payload', 'receipts_root']
-  const blockNumberPath = ['body', 'execution_payload', 'block_number']
 
   if (_srcSlot - _targetSlot < SLOTS_PER_HISTORICAL_ROOT || _srcSlot == _targetSlot) {
-    console.log('Fork name ', config.getForkInfo(_srcSlot))
-    console.log('fork version ', config.getForkVersion(_srcSlot))
     const STATE_INDEX = config.getForkTypes(_srcSlot).BeaconBlockHeader.getPathInfo(statePath).gindex
 
     const ROOT_INDEX = config.getForkTypes(_srcSlot).BeaconState.getPathInfo(rootPath).gindex
     const RECEIPT_INDEX = config.getForkTypes(_srcSlot).BeaconBlock.getPathInfo(receiptPath).gindex
-    console.log('Indexes ', STATE_INDEX, ROOT_INDEX, RECEIPT_INDEX)
 
     const blockRes = await api.beacon.getBlockV2({
       blockId: _srcSlot
     })
 
-    console.log('Get block Res')
     const blockView = config.getForkTypes(_srcSlot).BeaconBlock.toView(blockRes.value().message)
-    console.log('Got block view')
+
     const blockProof = blockView.createProof([statePath])
-    console.log('Got block proof')
+
     const blockTree = Tree.createFromProof(blockProof)
-    console.log('Got block Tree')
+
     const stateRootProof = blockTree.getProof({
       type: ProofType.single,
       gindex: STATE_INDEX
     })
-    console.log('Got state Root proof', stateRootProof)
 
     const stateRes = await api.debug.getStateV2({
       stateId: _srcSlot
     })
-    console.log('Got state Res')
     const stateView = config.getForkTypes(_srcSlot).BeaconState.toView(stateRes.value())
-    console.log('Got state view')
+
     const stateProof = stateView.createProof([rootPath])
-    console.log('got state Proof')
+
     const stateTree = Tree.createFromProof(stateProof)
-    console.log('Got state Tree')
+
     const rootProof = stateTree.getProof({
       type: ProofType.single,
       gindex: ROOT_INDEX
     })
-    console.log('Got rootProof')
 
     const oldBlockRes = await api.beacon.getBlockV2({
       blockId: _targetSlot
     })
 
-    console.log('Got oldlockRest')
     const oldBlockView = config.getForkTypes(_srcSlot).BeaconBlock.toView(oldBlockRes.value().message)
-    console.log('Got old Blockview')
+
     const oldBlockProof = oldBlockView.createProof([receiptPath])
-    console.log('Got oldblockProof')
+
     const oldBlockTree = Tree.createFromProof(oldBlockProof)
-    console.log('Got odlBlockTree')
+
     const receiptProof = oldBlockTree.getProof({
       type: ProofType.single,
       gindex: RECEIPT_INDEX
     })
-    console.log('Got reciept proof')
 
     receiptsRootProof = receiptProof.witnesses
       .concat(rootProof.witnesses)
       .concat(stateRootProof.witnesses)
       .map(bytesToHex)
     receiptsRoot = toHexString(receiptProof.leaf)
-    console.log('Receipt root ', receiptsRoot)
-    console.log('Got receipts roof proof')
   } else {
     throw Error('slots are too far')
   }
@@ -139,7 +126,6 @@ export const getReceiptProof = async (_hash, _client) => {
     } else if (_receipt.type != 'legacy') {
       throw Error(`Unknown receipt type ${_receipt.type}`)
     }
-    console.log('Type ', type)
 
     return encodeReceipt(
       {
